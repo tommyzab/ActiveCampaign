@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e # Stop script immediately on first error
 
-# 1. Generate a unique name using timestamp to ensure uniqueness
+# Generate a unique name using timestamp to ensure uniqueness
 UNIQUE_ID=$(date +%s)
 BUCKET_NAME="okta-eks-state-$UNIQUE_ID"
 TABLE_NAME="okta-eks-state-$UNIQUE_ID"
