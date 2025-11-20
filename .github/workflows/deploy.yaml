@@ -1,8 +1,0 @@
-#       SAFETY GATE: TERRAFORM APPLY
-#       In a production environment, we would uncomment the step below 
-#       to automatically apply changes when code is pushed to main.
-#       For this assignment, we stop at 'plan' to prevent unexpected AWS billing.
-#       ----------------------------------------------------------------
-#       - name: Terraform Apply
-#         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-#         run: terraform apply -auto-approve -input=false
