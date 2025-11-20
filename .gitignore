@@ -1,0 +1,17 @@
+cat > .gitignore <<EOF
+# Local .terraform directories
+**/.terraform/*
+.terraform/
+
+# .tfstate files
+*.tfstate
+*.tfstate.*
+
+# Secrets
+*.tfvars
+*.tfvars.json
+
+# Generated files
+backend.tf
+override.tf
+EOF
