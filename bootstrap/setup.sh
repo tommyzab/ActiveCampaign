@@ -3,8 +3,8 @@ set -e # Stop script immediately on first error
 
 # 1. Generate a unique name using timestamp to ensure uniqueness
 UNIQUE_ID=$(date +%s)
-BUCKET_NAME="kodekloud-lab-state-$UNIQUE_ID"
-TABLE_NAME="kodekloud-lab-locks-$UNIQUE_ID"
+BUCKET_NAME="okta-eks-state-$UNIQUE_ID"
+TABLE_NAME="okta-eks-state-$UNIQUE_ID"
 REGION="us-east-1"
 
 echo "====== STARTING SETUP ======"
