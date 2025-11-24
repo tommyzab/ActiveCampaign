@@ -12,9 +12,8 @@ provider "aws" {
   region = var.region
 }
 
-# We will uncomment this when we add the Identity module in Phase 3
-# provider "okta" {
-#   org_name  = var.okta_org_name
-#   base_url  = "okta.com"
-#   api_token = var.okta_api_token
-# }
+provider "okta" {
+  org_name  = var.enable_identity ? var.okta_org_name : null
+  base_url  = "okta.com"
+  api_token = var.enable_identity ? var.okta_api_token : null
+}

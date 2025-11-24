@@ -1,33 +1,47 @@
-# variables.tf
-
-variable "region" {
-  description = "AWS Region"
-  type        = string
-  default     = "us-east-1"
-}
-
 variable "project_name" {
-  description = "Project Name (used for tagging)"
+  description = "Canonical project prefix used for tagging and resource names."
   type        = string
-  default     = "okta-eks-assignment"
+  default     = "okta-eks-lab"
 }
 
 variable "environment" {
-  description = "Environment Name"
+  description = "Deployment stage (dev, staging, prod). Used for tagging."
   type        = string
   default     = "dev"
 }
 
-# --- Okta Secrets (Required for Provider, even if module is skipped) ---
-variable "okta_org_name" {
-  description = "Okta Org Name (e.g. dev-123456)"
+variable "region" {
+  description = "AWS region that hosts the VPC/EKS stack."
   type        = string
-  default     = "dev-MOCK" # Default allows 'terraform plan' to pass without prompt
+  default     = "us-east-1"
+}
+
+variable "okta_org_name" {
+  description = "Okta org slug (e.g., dev-123456). Optional for local runs without identity provisioning."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = !var.enable_identity || length(trim(var.okta_org_name)) > 0
+    error_message = "okta_org_name must be set when enable_identity is true."
+  }
 }
 
 variable "okta_api_token" {
-  description = "Okta API Token"
+  description = "API token for the Okta org. Leave empty to skip the identity module."
   type        = string
+  default     = ""
   sensitive   = true
-  default     = "MOCK_TOKEN" # Default allows 'terraform plan' to pass
+
+  validation {
+    condition     = !var.enable_identity || length(trim(var.okta_api_token)) > 0
+    error_message = "okta_api_token must be set when enable_identity is true."
+  }
 }
+
+variable "enable_identity" {
+  description = "Feature flag to control whether the Okta identity module is applied."
+  type        = bool
+  default     = false
+}
+
