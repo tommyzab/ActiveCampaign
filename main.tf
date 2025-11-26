@@ -47,9 +47,8 @@ resource "terraform_data" "validate_okta_config" {
 
 # Security Group for EKS Node Groups
 # This can be created by setup.sh or by Terraform (if setup.sh wasn't run)
-# Check if security group already exists (created by setup.sh)
-data "aws_security_group" "eks_nodes_existing" {
-  count = 1
+# Try to find existing security group (created by setup.sh)
+data "aws_security_groups" "eks_nodes_existing" {
   filter {
     name   = "group-name"
     values = ["okta-eks-nodes-sg"]
@@ -62,7 +61,7 @@ data "aws_security_group" "eks_nodes_existing" {
 
 # Create security group if it doesn't exist (fallback if setup.sh wasn't run)
 resource "aws_security_group" "eks_nodes" {
-  count       = length(data.aws_security_group.eks_nodes_existing) == 0 ? 1 : 0
+  count       = length(data.aws_security_groups.eks_nodes_existing.ids) == 0 ? 1 : 0
   name        = "okta-eks-nodes-sg"
   description = "Security group for EKS node groups (created by Terraform)"
   vpc_id      = data.aws_vpc.default.id
@@ -103,7 +102,7 @@ resource "aws_security_group" "eks_nodes" {
 
 # Use existing security group if it exists, otherwise use the one we created
 locals {
-  node_security_group_id = length(data.aws_security_group.eks_nodes_existing) > 0 ? data.aws_security_group.eks_nodes_existing[0].id : aws_security_group.eks_nodes[0].id
+  node_security_group_id = length(data.aws_security_groups.eks_nodes_existing.ids) > 0 ? data.aws_security_groups.eks_nodes_existing.ids[0] : aws_security_group.eks_nodes[0].id
 }
 
 # Deploy EKS Cluster
