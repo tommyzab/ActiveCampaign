@@ -147,7 +147,7 @@ terraform {
 EOF
 
 echo "6. Creating helper script to get cluster security group ID..."
-cat > get-cluster-sg.sh <<'HELPER_EOF'
+cat > bootstrap/get-cluster-sg.sh <<'HELPER_EOF'
 #!/bin/bash
 # Helper script to get the EKS cluster security group ID after terraform apply
 # This is needed for CloudFormation stack that creates unmanaged node groups
@@ -244,8 +244,8 @@ if [ -n "$NODE_SG_ID" ] && [ "$NODE_SG_ID" != "None" ]; then
     echo "  export NODE_SG_ID=$NODE_SG_ID"
 fi
 HELPER_EOF
-chmod +x get-cluster-sg.sh
-echo "   -> Created get-cluster-sg.sh helper script"
+chmod +x bootstrap/get-cluster-sg.sh
+echo "   -> Created bootstrap/get-cluster-sg.sh helper script"
 
 echo "====== VERIFICATION ======"
 echo "Checking if resources exist..."

@@ -17,3 +17,8 @@ output "cluster_security_group_id" {
   description = "Security group ID attached to the EKS cluster. Use this in CloudFormation stack for unmanaged node groups."
   value       = module.eks.cluster_security_group_id
 }
+
+output "node_security_group_id" {
+  description = "Security group ID for EKS node groups. Use this in CloudFormation stack for unmanaged node groups."
+  value       = local.node_security_group_id
+}

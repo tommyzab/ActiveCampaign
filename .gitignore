@@ -22,3 +22,6 @@ iam-policy-terraform-user.json
 *.pem
 *keypair*.pem
 okta-eks-nodes-keypair.pem
+
+# Bootstrap scripts (local only, not in repo)
+bootstrap/
