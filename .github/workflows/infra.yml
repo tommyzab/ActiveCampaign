@@ -12,8 +12,8 @@ on:
         default: "false"
 
 permissions:
-  id-token: write
   contents: read
+  # id-token: write # Removed: Only needed for OIDC, not needed for Access Keys
 
 env:
   AWS_REGION: us-east-1
@@ -34,11 +34,14 @@ jobs:
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
+      # --- FIXED: Using Access Keys instead of Role Assumption ---
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+      # ---------------------------------------------------------
 
       - name: Export Okta Secrets
         env:
@@ -94,11 +97,14 @@ jobs:
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
+      # --- FIXED: Using Access Keys instead of Role Assumption ---
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+      # ---------------------------------------------------------
 
       - name: Download Plan Artifact
         uses: actions/download-artifact@v4
@@ -120,4 +126,3 @@ jobs:
           TF_VAR_okta_org_name: ${{ secrets.OKTA_ORG_NAME }}
           TF_VAR_enable_identity: ${{ secrets.ENABLE_IDENTITY != '' && secrets.ENABLE_IDENTITY || 'false' }}
         run: terraform apply tfplan.binary
-
