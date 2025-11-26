@@ -1,4 +1,3 @@
-cat > .gitignore <<EOF
 # Local .terraform directories
 **/.terraform/*
 .terraform/
@@ -14,4 +13,7 @@ cat > .gitignore <<EOF
 # Generated files
 backend.tf
 override.tf
-EOF
+
+# Personal notes
+COST_OPTIMIZATION_NOTES.md
+iam-policy-terraform-user.json
