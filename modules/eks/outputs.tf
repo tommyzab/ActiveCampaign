@@ -17,3 +17,8 @@ output "oidc_provider_arn" {
   description = "The ARN of the OIDC Provider if enable_irsa = true"
   value       = module.eks.oidc_provider_arn
 }
+
+output "cluster_security_group_id" {
+  description = "Security group ID attached to the EKS cluster. Required for CloudFormation node group stacks."
+  value       = module.eks.cluster_security_group_id
+}

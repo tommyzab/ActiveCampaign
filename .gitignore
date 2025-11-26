@@ -17,3 +17,8 @@ override.tf
 # Personal notes
 COST_OPTIMIZATION_NOTES.md
 iam-policy-terraform-user.json
+
+# EC2 Key Pairs (sensitive)
+*.pem
+*keypair*.pem
+okta-eks-nodes-keypair.pem
