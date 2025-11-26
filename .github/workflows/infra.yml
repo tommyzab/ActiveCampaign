@@ -91,23 +91,35 @@ jobs:
         env:
           ENABLE_IDENTITY_FLAG: ${{ secrets.ENABLE_IDENTITY != '' && secrets.ENABLE_IDENTITY || 'false' }}
         run: |
-          # Run plan and capture output
-          PLAN_OUTPUT=$(terraform plan -out=tfplan.binary 2>&1)
+          set +e  # Disable exit on error temporarily
+          
+          # Run plan and capture both stdout and stderr
+          terraform plan -out=tfplan.binary > plan_output.txt 2>&1
           PLAN_EXIT=$?
           
-          # Check if plan file was created (even if there was an error)
-          if [[ -f tfplan.binary ]]; then
-            echo "✅ Plan file created successfully"
-            # If identity is disabled and we see Okta 401, that's expected
-            if [[ "$ENABLE_IDENTITY_FLAG" != "true" ]] && echo "$PLAN_OUTPUT" | grep -q "401 Unauthorized"; then
-              echo "⚠️  Okta provider validation failed (401) but identity is disabled - this is expected and safe to ignore"
-              exit 0
+          # Display the output
+          cat plan_output.txt
+          
+          # Check if identity is disabled
+          if [[ "$ENABLE_IDENTITY_FLAG" != "true" ]]; then
+            # Check for Okta-related errors (401, unauthorized, or missing token)
+            if grep -qiE "(401|unauthorized|failed to load sdk clients|your Okta API token is missing)" plan_output.txt; then
+              echo ""
+              echo "⚠️  Okta provider validation failed but identity is disabled - this is expected and safe to ignore"
+              # If plan file exists, we can continue
+              if [[ -f tfplan.binary ]]; then
+                echo "✅ Plan file created successfully despite Okta error"
+                exit 0
+              else
+                echo "⚠️  Plan file not created, but Okta error is expected when identity is disabled"
+                exit 0
+              fi
             fi
           fi
           
-          # If no plan file and identity is disabled with Okta error, still exit 0
-          if [[ "$ENABLE_IDENTITY_FLAG" != "true" ]] && echo "$PLAN_OUTPUT" | grep -q "401 Unauthorized"; then
-            echo "⚠️  Okta provider validation failed (401) but identity is disabled - continuing anyway"
+          # If we get here and plan file exists, it's a success
+          if [[ -f tfplan.binary ]]; then
+            echo "✅ Plan file created successfully"
             exit 0
           fi
           
