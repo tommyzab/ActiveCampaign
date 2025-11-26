@@ -86,7 +86,8 @@ jobs:
         # Okta variables are already set in GITHUB_ENV from previous step
         # Note: Okta provider may show validation errors when enable_identity=false, but this is expected
         # The provider won't actually be used when identity is disabled (module.identity has count=0)
-        run: terraform plan -out=tfplan.binary || (echo "Plan completed with warnings (Okta provider validation expected when identity disabled)" && exit 0)
+        continue-on-error: true
+        run: terraform plan -out=tfplan.binary
 
       - name: Upload Plan Artifact
         uses: actions/upload-artifact@v4
