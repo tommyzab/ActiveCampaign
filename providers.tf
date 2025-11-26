@@ -10,11 +10,13 @@ provider "aws" {
   region = var.region
 }
 
+# Okta provider configuration
+# Note: The provider will attempt validation during terraform plan even when enable_identity is false
+# This is a known limitation - Terraform initializes all providers regardless of whether they're used
+# When enable_identity=false, module.identity has count=0, so the provider won't actually be used
+# The validation error can be ignored in CI/CD when identity is disabled
 provider "okta" {
-  # When identity is disabled, use dummy values to prevent provider validation errors during init
-  # The provider won't actually be used when enable_identity is false (module.identity has count=0)
-  # but Terraform still initializes all providers during terraform init
-  org_name  = var.enable_identity ? var.okta_org_name : coalesce(var.okta_org_name, "dummy-org")
+  org_name  = var.enable_identity ? var.okta_org_name : "dev-000000"
   base_url  = "okta.com"
-  api_token = var.enable_identity ? var.okta_api_token : coalesce(var.okta_api_token, "00DummyTokenForValidationWhenIdentityDisabled1234567890abcdef")
+  api_token = var.enable_identity ? var.okta_api_token : "00DummyTokenForValidationWhenIdentityDisabled1234567890abcdef"
 }
