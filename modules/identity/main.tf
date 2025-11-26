@@ -1,3 +1,12 @@
+terraform {
+  required_providers {
+    okta = {
+      source  = "okta/okta"
+      version = "~> 4.0"
+    }
+  }
+}
+
 # 1. Create the K8s Admin Group
 resource "okta_group" "k8s_admins" {
   name        = "k8s-cluster-admins"

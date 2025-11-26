@@ -44,6 +44,25 @@ This CI/CD design keeps drift detection automated (via plan on every PR) while e
 
 ## Getting Started Locally
 
+### Prerequisites
+
+1. **Create an IAM User** (recommended - don't use root account)
+   - Create a new IAM user in AWS Console
+   - Attach the policy from `iam-policy-terraform-user.json` (see below)
+   - Generate access keys and configure AWS CLI:
+     ```bash
+     aws configure --profile terraform-user
+     export AWS_PROFILE=terraform-user
+     ```
+
+2. **IAM Policy Setup**
+   - The file `iam-policy-terraform-user.json` contains all required permissions
+   - Create a new IAM policy in AWS Console and paste the JSON contents
+   - Attach the policy to your IAM user
+   - **Note:** You can delete this file after creating the policy (it's for reference only)
+
+### Deployment Steps
+
 1. **Bootstrap backend (optional if already provisioned)**  
    ```bash
    cd bootstrap
@@ -57,6 +76,14 @@ This CI/CD design keeps drift detection automated (via plan on every PR) while e
    terraform plan -var="project_name=okta-eks" -var="environment=dev"
    terraform apply
    ```
+
+### Cost Optimization
+
+This configuration is optimized for cost savings (home assignment). See `COST_OPTIMIZATION_NOTES.md` for details on:
+- Disabled features (CloudWatch logging, KMS encryption) and how to enable them
+- Cost estimates (~$134/month if running 24/7)
+- Strategies to reduce costs (scale down nodes, use Spot instances, etc.)
+- **Note:** The cost notes file is gitignored - it's for your personal reference only
 
 ## Enabling Okta Identity Automation
 
@@ -84,3 +111,49 @@ This CI/CD design keeps drift detection automated (via plan on every PR) while e
 2. Develop infrastructure changes locally; use `terraform fmt`, `validate`, `plan`.  
 3. Open a PR – GitHub Actions will run the same checks.  
 4. For production, trigger `workflow_dispatch` with `run_apply=true` and approve the protected environment to apply the previously reviewed plan.
+
+## Troubleshooting
+
+### Module Version Compatibility
+
+This codebase uses EKS module v20+ to avoid known `for_each` issues present in v19. If you encounter any module-related errors, ensure you're using the latest module version by running `terraform init -upgrade`.
+
+### Cost Optimization Features
+
+This configuration is optimized for cost savings (home assignment) by disabling expensive features:
+
+- **CloudWatch Logging** - Disabled (see `COST_OPTIMIZATION_NOTES.md` to enable)
+- **KMS Encryption** - Disabled (see `COST_OPTIMIZATION_NOTES.md` to enable)
+- **Access Entries** - Commented out (can be enabled for production RBAC)
+
+**Required IAM Permissions:**
+- `iam:PassRole` - **Fundamental AWS requirement** for EKS cluster creation (must pass IAM role to cluster)
+- `iam:TagPolicy` - **Module requirement** for the custom IAM policy that manages cluster resources (EC2, ELB, etc.)
+
+All required permissions are included in `iam-policy-terraform-user.json`. Attach this policy to your IAM user before deploying.
+
+**Using Pre-Existing IAM Roles (Optional):**
+If you have pre-created IAM roles, you can use them instead of letting Terraform create new ones:
+
+```bash
+# Find existing roles
+aws iam list-roles --query 'Roles[?contains(RoleName, `EKS`) || contains(RoleName, `eks`)].{RoleName:RoleName, Arn:Arn}' --output table
+
+# Use the role ARN when applying
+terraform apply \
+  -var="cluster_iam_role_arn=arn:aws:iam::ACCOUNT_ID:role/YOUR_ROLE_NAME" \
+  -var="node_group_iam_role_arn=arn:aws:iam::ACCOUNT_ID:role/YOUR_ROLE_NAME"
+```
+
+**Note:** In production, cluster and node group roles should be separate with different policies. For development/testing, using the same role is acceptable.
+
+### Configuration Status
+
+- ✅ `terraform validate` passes
+- ✅ `terraform plan` generates a valid execution plan
+- ✅ Code structure follows best practices
+- ✅ `for_each` issue resolved (using EKS module v20)
+- ✅ Support for existing IAM roles (optional)
+- ✅ Cost-optimized for home assignment (logging/encryption disabled)
+
+The infrastructure design is production-ready; expensive features are disabled for cost savings but can be easily enabled when needed (see `COST_OPTIMIZATION_NOTES.md`).

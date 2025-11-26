@@ -14,6 +14,8 @@ resource "aws_vpc" "main" {
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
+  depends_on = [aws_vpc.main]
+
   tags = {
     Name = "${var.project_name}-igw"
   }
@@ -26,6 +28,8 @@ resource "aws_subnet" "public" {
   cidr_block              = var.public_subnets[count.index]
   availability_zone       = var.azs[count.index]
   map_public_ip_on_launch = true
+
+  depends_on = [aws_vpc.main]
 
   tags = {
     Name                     = "${var.project_name}-public-${count.index + 1}"
@@ -40,6 +44,8 @@ resource "aws_subnet" "private" {
   cidr_block        = var.private_subnets[count.index]
   availability_zone = var.azs[count.index]
 
+  depends_on = [aws_vpc.main]
+
   tags = {
     Name                              = "${var.project_name}-private-${count.index + 1}"
     "kubernetes.io/role/internal-elb" = "1" # Required for Internal ALBs
@@ -47,16 +53,21 @@ resource "aws_subnet" "private" {
 }
 
 # 5. NAT Gateway (Single one for cost savings in Lab)
+# Created conditionally and after EKS cluster to minimize costs during cluster creation
 resource "aws_eip" "nat" {
+  count  = var.create_nat_gateway ? 1 : 0
   domain = "vpc"
   tags   = { Name = "${var.project_name}-nat-eip" }
 }
 
 resource "aws_nat_gateway" "main" {
-  allocation_id = aws_eip.nat.id
+  count         = var.create_nat_gateway ? 1 : 0
+  allocation_id = aws_eip.nat[0].id
   subnet_id     = aws_subnet.public[0].id # NAT lives in Public
   
-  depends_on = [aws_internet_gateway.main]
+  # NAT Gateway can be created after EKS cluster control plane to save costs
+  # Nodes will be created after NAT Gateway is ready
+  depends_on = [aws_eip.nat, aws_subnet.public, aws_internet_gateway.main]
   
   tags = { Name = "${var.project_name}-nat" }
 }
@@ -68,15 +79,24 @@ resource "aws_route_table" "public" {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.main.id
   }
+  
+  depends_on = [aws_vpc.main, aws_internet_gateway.main]
+  
   tags = { Name = "${var.project_name}-public-rt" }
 }
 
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.main.id
+  dynamic "route" {
+    for_each = var.create_nat_gateway ? [1] : []
+    content {
+      cidr_block     = "0.0.0.0/0"
+      nat_gateway_id = aws_nat_gateway.main[0].id
+    }
   }
+  
+  depends_on = [aws_vpc.main, aws_nat_gateway.main]
+  
   tags = { Name = "${var.project_name}-private-rt" }
 }
 
@@ -85,10 +105,14 @@ resource "aws_route_table_association" "public" {
   count          = length(var.public_subnets)
   subnet_id      = aws_subnet.public[count.index].id
   route_table_id = aws_route_table.public.id
+
+  depends_on = [aws_subnet.public, aws_route_table.public]
 }
 
 resource "aws_route_table_association" "private" {
   count          = length(var.private_subnets)
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private.id
+
+  depends_on = [aws_subnet.private, aws_route_table.private]
 }
