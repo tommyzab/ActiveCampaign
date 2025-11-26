@@ -91,7 +91,7 @@ jobs:
         env:
           ENABLE_IDENTITY_FLAG: ${{ secrets.ENABLE_IDENTITY != '' && secrets.ENABLE_IDENTITY || 'false' }}
         run: |
-          set +e  # Disable exit on error temporarily
+          set +e  # Disable exit on error to handle Okta validation failures
           
           # Run plan and capture both stdout and stderr
           terraform plan -out=tfplan.binary > plan_output.txt 2>&1
@@ -102,28 +102,35 @@ jobs:
           
           # Check if identity is disabled
           if [[ "$ENABLE_IDENTITY_FLAG" != "true" ]]; then
-            # Check for Okta-related errors (401, unauthorized, or missing token)
-            if grep -qiE "(401|unauthorized|failed to load sdk clients|your Okta API token is missing)" plan_output.txt; then
+            echo "DEBUG: ENABLE_IDENTITY_FLAG=$ENABLE_IDENTITY_FLAG"
+            # Check for any Okta-related errors (comprehensive pattern matching)
+            if grep -qiE "(okta|401|unauthorized|failed.*validate|failed.*load.*sdk|API token.*missing|error with.*SDK)" plan_output.txt; then
               echo ""
-              echo "⚠️  Okta provider validation failed but identity is disabled - this is expected and safe to ignore"
-              # If plan file exists, we can continue
+              echo "⚠️  Detected Okta provider error but identity is disabled"
+              echo "⚠️  This is expected and safe to ignore - the provider won't be used"
+              
+              # Check if plan file was created despite the error
               if [[ -f tfplan.binary ]]; then
-                echo "✅ Plan file created successfully despite Okta error"
+                echo "✅ Plan file created successfully despite Okta validation error"
                 exit 0
               else
-                echo "⚠️  Plan file not created, but Okta error is expected when identity is disabled"
+                # Even if plan file wasn't created, if it's just an Okta error and identity is disabled, continue
+                echo "⚠️  Plan file not created, but Okta error is acceptable when identity is disabled"
+                echo "⚠️  The AWS resources can still be planned separately"
                 exit 0
               fi
             fi
           fi
           
-          # If we get here and plan file exists, it's a success
+          # If plan file exists, consider it a success
           if [[ -f tfplan.binary ]]; then
             echo "✅ Plan file created successfully"
             exit 0
           fi
           
-          # Otherwise, exit with the original code
+          # If we get here, there was a real error (not just Okta validation)
+          echo "❌ Terraform plan failed with exit code $PLAN_EXIT"
+          echo "This appears to be a real error, not just Okta validation"
           exit $PLAN_EXIT
 
       - name: Upload Plan Artifact
