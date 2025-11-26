@@ -80,13 +80,15 @@ jobs:
         run: terraform fmt -check
 
       - name: Terraform Validate
+        # Skip provider verification during validate when identity is disabled
+        env:
+          TF_SKIP_PROVIDER_VERIFY: ${{ secrets.ENABLE_IDENTITY != 'true' && 'true' || 'false' }}
         run: terraform validate
 
       - name: Terraform Plan
-        # Okta variables are already set in GITHUB_ENV from previous step
-        # Note: Okta provider may show validation errors when enable_identity=false, but this is expected
-        # The provider won't actually be used when identity is disabled (module.identity has count=0)
-        continue-on-error: true
+        # Skip Okta provider validation when identity is disabled to prevent 401 errors
+        env:
+          TF_SKIP_PROVIDER_VERIFY: ${{ secrets.ENABLE_IDENTITY != 'true' && 'true' || 'false' }}
         run: terraform plan -out=tfplan.binary
 
       - name: Upload Plan Artifact
