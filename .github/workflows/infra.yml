@@ -48,11 +48,22 @@ jobs:
           OKTA_TOKEN: ${{ secrets.OKTA_API_TOKEN }}
           OKTA_ORG: ${{ secrets.OKTA_ORG_NAME }}
         run: |
+          # Export Okta secrets if present, otherwise use dummy values to satisfy provider validation
           if [[ -n "${OKTA_TOKEN}" ]]; then
-            echo "OKTA_API_TOKEN=${OKTA_TOKEN}" >> "$GITHUB_ENV"
+            echo "TF_VAR_okta_api_token=${OKTA_TOKEN}" >> "$GITHUB_ENV"
+          else
+            echo "TF_VAR_okta_api_token=dummy-token-for-validation" >> "$GITHUB_ENV"
           fi
           if [[ -n "${OKTA_ORG}" ]]; then
             echo "TF_VAR_okta_org_name=${OKTA_ORG}" >> "$GITHUB_ENV"
+          else
+            echo "TF_VAR_okta_org_name=dummy-org" >> "$GITHUB_ENV"
+          fi
+          # Set enable_identity based on secret or default to false
+          if [[ -n "${{ secrets.ENABLE_IDENTITY }}" && "${{ secrets.ENABLE_IDENTITY }}" == "true" ]]; then
+            echo "TF_VAR_enable_identity=true" >> "$GITHUB_ENV"
+          else
+            echo "TF_VAR_enable_identity=false" >> "$GITHUB_ENV"
           fi
 
       - name: Terraform Init
@@ -70,9 +81,7 @@ jobs:
         run: terraform validate
 
       - name: Terraform Plan
-        env:
-          TF_VAR_okta_api_token: ${{ secrets.OKTA_API_TOKEN }}
-          TF_VAR_enable_identity: ${{ secrets.ENABLE_IDENTITY != '' && secrets.ENABLE_IDENTITY || 'false' }}
+        # Okta variables are already set in GITHUB_ENV from previous step
         run: terraform plan -out=tfplan.binary
 
       - name: Upload Plan Artifact

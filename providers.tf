@@ -11,7 +11,9 @@ provider "aws" {
 }
 
 provider "okta" {
-  org_name  = var.enable_identity ? var.okta_org_name : null
+  # Use empty strings when identity is disabled to prevent provider validation errors
+  # The provider will not be used when enable_identity is false, but it still needs valid values
+  org_name  = var.enable_identity ? var.okta_org_name : ""
   base_url  = "okta.com"
-  api_token = var.enable_identity ? var.okta_api_token : null
+  api_token = var.enable_identity ? var.okta_api_token : ""
 }
