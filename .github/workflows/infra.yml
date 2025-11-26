@@ -48,25 +48,11 @@ jobs:
           OKTA_TOKEN: ${{ secrets.OKTA_API_TOKEN }}
           OKTA_ORG: ${{ secrets.OKTA_ORG_NAME }}
         run: |
-          # Export Okta secrets if present, otherwise use dummy values to satisfy provider validation
-          # Note: Dummy values are only used when enable_identity is false, so provider won't actually connect
-          if [[ -n "${OKTA_TOKEN}" ]]; then
-            echo "TF_VAR_okta_api_token=${OKTA_TOKEN}" >> "$GITHUB_ENV"
-          else
-            # Use a long dummy token that looks valid (Okta tokens are typically 40+ characters)
-            echo "TF_VAR_okta_api_token=00DummyTokenForValidationWhenIdentityDisabled1234567890abcdef" >> "$GITHUB_ENV"
-          fi
-          if [[ -n "${OKTA_ORG}" ]]; then
-            echo "TF_VAR_okta_org_name=${OKTA_ORG}" >> "$GITHUB_ENV"
-          else
-            echo "TF_VAR_okta_org_name=dummy-org" >> "$GITHUB_ENV"
-          fi
-          # Set enable_identity based on secret or default to false
-          if [[ -n "${{ secrets.ENABLE_IDENTITY }}" && "${{ secrets.ENABLE_IDENTITY }}" == "true" ]]; then
-            echo "TF_VAR_enable_identity=true" >> "$GITHUB_ENV"
-          else
-            echo "TF_VAR_enable_identity=false" >> "$GITHUB_ENV"
-          fi
+          # Export Okta secrets (use dummy values if missing and identity is disabled)
+          echo "TF_VAR_okta_api_token=${OKTA_TOKEN:-00DummyTokenForValidationWhenIdentityDisabled1234567890abcdef}" >> "$GITHUB_ENV"
+          echo "TF_VAR_okta_org_name=${OKTA_ORG:-dummy-org}" >> "$GITHUB_ENV"
+          # Enable identity module if ENABLE_IDENTITY secret is set to 'true'
+          echo "TF_VAR_enable_identity=${{ secrets.ENABLE_IDENTITY != '' && secrets.ENABLE_IDENTITY || 'false' }}" >> "$GITHUB_ENV"
 
       - name: Terraform Init
         run: |
@@ -85,53 +71,26 @@ jobs:
         run: terraform validate
 
       - name: Terraform Plan
-        # Okta provider may show 401 errors when identity is disabled - this is expected and safe to ignore
-        # The provider won't actually be used when enable_identity=false (module.identity has count=0)
+        # Handle Okta provider validation errors gracefully when identity is disabled
         continue-on-error: ${{ secrets.ENABLE_IDENTITY != 'true' }}
         env:
           ENABLE_IDENTITY_FLAG: ${{ secrets.ENABLE_IDENTITY != '' && secrets.ENABLE_IDENTITY || 'false' }}
         run: |
-          set +e  # Disable exit on error to handle Okta validation failures
+          set +e  # Allow plan to fail without exiting immediately
           
-          # Run plan and capture both stdout and stderr
           terraform plan -out=tfplan.binary > plan_output.txt 2>&1
           PLAN_EXIT=$?
-          
-          # Display the output
           cat plan_output.txt
           
-          # Check if identity is disabled
-          if [[ "$ENABLE_IDENTITY_FLAG" != "true" ]]; then
-            echo "DEBUG: ENABLE_IDENTITY_FLAG=$ENABLE_IDENTITY_FLAG"
-            # Check for any Okta-related errors (comprehensive pattern matching)
-            if grep -qiE "(okta|401|unauthorized|failed.*validate|failed.*load.*sdk|API token.*missing|error with.*SDK)" plan_output.txt; then
-              echo ""
-              echo "⚠️  Detected Okta provider error but identity is disabled"
-              echo "⚠️  This is expected and safe to ignore - the provider won't be used"
-              
-              # Check if plan file was created despite the error
-              if [[ -f tfplan.binary ]]; then
-                echo "✅ Plan file created successfully despite Okta validation error"
-                exit 0
-              else
-                # Even if plan file wasn't created, if it's just an Okta error and identity is disabled, continue
-                echo "⚠️  Plan file not created, but Okta error is acceptable when identity is disabled"
-                echo "⚠️  The AWS resources can still be planned separately"
-                exit 0
-              fi
-            fi
-          fi
-          
-          # If plan file exists, consider it a success
-          if [[ -f tfplan.binary ]]; then
-            echo "✅ Plan file created successfully"
+          # If identity is disabled and we see Okta errors, that's expected
+          if [[ "$ENABLE_IDENTITY_FLAG" != "true" ]] && grep -qiE "(okta|401|unauthorized|failed.*validate|failed.*load.*sdk|API token.*missing)" plan_output.txt; then
+            echo "⚠️  Okta provider error detected but identity is disabled - this is expected"
+            [[ -f tfplan.binary ]] && echo "✅ Plan file created successfully" || echo "⚠️  Plan file not created, but Okta error is acceptable when identity is disabled"
             exit 0
           fi
           
-          # If we get here, there was a real error (not just Okta validation)
-          echo "❌ Terraform plan failed with exit code $PLAN_EXIT"
-          echo "This appears to be a real error, not just Okta validation"
-          exit $PLAN_EXIT
+          # Success if plan file exists, otherwise exit with original code
+          [[ -f tfplan.binary ]] && exit 0 || exit $PLAN_EXIT
 
       - name: Upload Plan Artifact
         uses: actions/upload-artifact@v4
