@@ -79,25 +79,50 @@ else
             echo "   -> Security group created: $NODE_SG_ID"
             
             # Add inbound rules for EKS nodes
-            # Allow all traffic from itself (node-to-node communication)
+            # 1. Allow all traffic from itself (node-to-node pod communication)
+            #    This is required for pods to communicate across nodes
             aws ec2 authorize-security-group-ingress \
                 --group-id "$NODE_SG_ID" \
                 --protocol -1 \
                 --source-group "$NODE_SG_ID" \
                 --region "$REGION" 2>/dev/null || echo "   -> Warning: Could not add self-referencing rule"
             
-            # Allow SSH access (port 22) - you can restrict this to specific IPs if needed
-            aws ec2 authorize-security-group-ingress \
-                --group-id "$NODE_SG_ID" \
-                --protocol tcp \
-                --port 22 \
-                --cidr 0.0.0.0/0 \
-                --region "$REGION" 2>/dev/null || echo "   -> Warning: Could not add SSH rule"
+            # 2. Allow traffic from cluster security group (will be added after cluster creation)
+            #    This is handled by get-cluster-sg.sh script after terraform apply
+            #    Required ports: 443 (HTTPS from control plane), 10250 (kubelet)
             
-            # Allow HTTPS outbound (for pulling images, etc.) - already allowed by default, but explicit is better
-            # Note: Outbound is allowed by default, so we don't need to add explicit rules
+            # 3. SSH access - RESTRICTED: Only allow from VPC CIDR (not 0.0.0.0/0)
+            #    Get VPC CIDR for more secure SSH access
+            VPC_CIDR=$(aws ec2 describe-vpcs \
+                --vpc-ids "$DEFAULT_VPC_ID" \
+                --region "$REGION" \
+                --query 'Vpcs[0].CidrBlock' \
+                --output text 2>/dev/null)
+            
+            if [ -n "$VPC_CIDR" ] && [ "$VPC_CIDR" != "None" ]; then
+                aws ec2 authorize-security-group-ingress \
+                    --group-id "$NODE_SG_ID" \
+                    --protocol tcp \
+                    --port 22 \
+                    --cidr "$VPC_CIDR" \
+                    --region "$REGION" 2>/dev/null || echo "   -> Warning: Could not add SSH rule from VPC"
+                echo "   -> SSH access restricted to VPC CIDR: $VPC_CIDR"
+            else
+                # Fallback: Allow SSH from VPC private IP range (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)
+                # This is more secure than 0.0.0.0/0 but still allows from any private network
+                echo "   -> Warning: Could not determine VPC CIDR. SSH access not configured."
+                echo "   -> You can manually add SSH access later if needed."
+            fi
+            
+            # Note: Outbound traffic is allowed by default (required for pulling images, etc.)
+            # Specific outbound rules:
+            # - Port 443 (HTTPS) to ECR and public registries
+            # - Port 53 (DNS) for service discovery
+            # - All traffic to cluster security group (for kubelet on port 10250)
+            # These are typically handled automatically, but cluster SG rule is added later
             
             echo "   -> Security group rules configured"
+            echo "   -> Note: Cluster SG rule will be added after cluster creation via get-cluster-sg.sh"
         else
             echo "   -> Warning: Could not create security group (may need permissions). Continuing..."
             NODE_SG_ID=""
