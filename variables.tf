@@ -16,14 +16,10 @@ variable "region" {
   default     = "us-east-1"
 }
 
-# IAM Role ARNs are now hardcoded in main.tf using data.aws_caller_identity.current.account_id
-# No variables needed for IAM roles - they are automatically constructed
-
 variable "okta_org_name" {
   description = "Okta org slug (e.g., dev-123456). Found in your Okta admin URL: https://YOUR_ORG.okta.com. IMPORTANT: Do NOT include '-admin' - use just the org name (e.g., 'integrator-4772467' not 'integrator-4772467-admin')"
   type        = string
   default     = ""
-  # Note: Validation is done via precondition in main.tf (variable validation cannot reference other variables)
 }
 
 variable "okta_api_token" {
@@ -31,7 +27,6 @@ variable "okta_api_token" {
   type        = string
   default     = ""
   sensitive   = true
-  # Note: Validation is done via precondition in main.tf (variable validation cannot reference other variables)
 }
 
 variable "enable_identity" {

@@ -1,13 +1,10 @@
-# main.tf
-
-# Data sources for default VPC and subnets
 data "aws_caller_identity" "current" {}
 
 data "aws_vpc" "default" {
   default = true
 }
 
-# Get all default subnets
+# Retrieves all subnets in default VPC
 data "aws_subnets" "default" {
   filter {
     name   = "vpc-id"
@@ -15,13 +12,13 @@ data "aws_subnets" "default" {
   }
 }
 
-# Get subnet details to filter out us-east-1e
+# Gets subnet details to filter by availability zone
 data "aws_subnet" "default" {
   for_each = toset(data.aws_subnets.default.ids)
   id       = each.value
 }
 
-# Filter subnets to exclude us-east-1e
+# Filters out us-east-1e subnet from default subnets list
 locals {
   default_subnet_ids = [
     for subnet in data.aws_subnet.default :
@@ -29,12 +26,10 @@ locals {
   ]
 }
 
-# Validate Okta configuration when identity is enabled
-# This precondition ensures required Okta variables are set when enable_identity is true
+# Validates Okta variables are set when enable_identity is true
 resource "terraform_data" "validate_okta_config" {
   lifecycle {
     precondition {
-      # If identity is enabled, org name and token must NOT be empty
       condition = !var.enable_identity || (
         length(trimspace(var.okta_org_name)) > 0 &&
         length(trimspace(var.okta_api_token)) > 0 &&
@@ -45,9 +40,7 @@ resource "terraform_data" "validate_okta_config" {
   }
 }
 
-# Security Group for EKS Node Groups
-# This can be created by setup.sh or by Terraform (if setup.sh wasn't run)
-# Try to find existing security group (created by setup.sh)
+# Checks if node security group exists (created by setup.sh)
 data "aws_security_groups" "eks_nodes_existing" {
   filter {
     name   = "group-name"
@@ -59,14 +52,13 @@ data "aws_security_groups" "eks_nodes_existing" {
   }
 }
 
-# Create security group if it doesn't exist (fallback if setup.sh wasn't run)
+# Creates node security group if setup.sh didn't create it
 resource "aws_security_group" "eks_nodes" {
   count       = length(data.aws_security_groups.eks_nodes_existing.ids) == 0 ? 1 : 0
   name        = "okta-eks-nodes-sg"
   description = "Security group for EKS node groups (created by Terraform)"
   vpc_id      = data.aws_vpc.default.id
 
-  # Allow all traffic from itself (node-to-node pod communication)
   ingress {
     description = "Node-to-node communication"
     from_port   = 0
@@ -75,7 +67,6 @@ resource "aws_security_group" "eks_nodes" {
     self        = true
   }
 
-  # Allow SSH from VPC CIDR
   ingress {
     description = "SSH from VPC"
     from_port   = 22
@@ -84,7 +75,6 @@ resource "aws_security_group" "eks_nodes" {
     cidr_blocks = [data.aws_vpc.default.cidr_block]
   }
 
-  # Allow all outbound traffic (required for pulling images, etc.)
   egress {
     description = "All outbound traffic"
     from_port   = 0
@@ -100,12 +90,12 @@ resource "aws_security_group" "eks_nodes" {
   }
 }
 
-# Use existing security group if it exists, otherwise use the one we created
+# Uses existing security group if found, otherwise uses Terraform-created one
 locals {
   node_security_group_id = length(data.aws_security_groups.eks_nodes_existing.ids) > 0 ? data.aws_security_groups.eks_nodes_existing.ids[0] : aws_security_group.eks_nodes[0].id
 }
 
-# Deploy EKS Cluster
+# Deploys EKS cluster with IRSA enabled for Okta integration
 module "eks" {
   source = "./modules/eks"
 
@@ -113,17 +103,14 @@ module "eks" {
   environment  = var.environment
   cluster_name = "demo-eks"
 
-  # Use Default VPC and Default Subnets (filtered to exclude us-east-1e)
   vpc_id             = data.aws_vpc.default.id
   private_subnet_ids = local.default_subnet_ids
 
-  # Hardcoded IAM Role ARNs (must exist in the account)
   cluster_iam_role_arn    = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/eksClusterRole"
   node_group_iam_role_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/eksNodeRole"
 }
 
-# Add rule to allow traffic from cluster security group to node security group
-# This is required for EKS cluster-to-node communication
+# Allows cluster security group to communicate with node security group
 resource "aws_security_group_rule" "cluster_to_nodes" {
   type                     = "ingress"
   from_port                = 0
@@ -134,8 +121,7 @@ resource "aws_security_group_rule" "cluster_to_nodes" {
   description              = "Allow all traffic from EKS cluster security group"
 }
 
-# 3. Deploy Identity (Okta Configuration)
-# Enabled via var.enable_identity to keep local testing simple.
+# Configures Okta groups, rules, and OIDC app for EKS access (enabled via var.enable_identity)
 module "identity" {
   count  = var.enable_identity ? 1 : 0
   source = "./modules/identity"

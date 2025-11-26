@@ -1,4 +1,3 @@
-# 1. The VPC
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
@@ -10,7 +9,7 @@ resource "aws_vpc" "main" {
   }
 }
 
-# 2. Internet Gateway (Entry point)
+# Connects VPC to internet for public subnet access
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
@@ -21,7 +20,7 @@ resource "aws_internet_gateway" "main" {
   }
 }
 
-# 3. Public Subnets (For Load Balancers)
+# Creates public subnets for load balancers with ELB role tag
 resource "aws_subnet" "public" {
   count                   = length(var.public_subnets)
   vpc_id                  = aws_vpc.main.id
@@ -33,11 +32,11 @@ resource "aws_subnet" "public" {
 
   tags = {
     Name                     = "${var.project_name}-public-${count.index + 1}"
-    "kubernetes.io/role/elb" = "1" # Required for Public ALBs
+    "kubernetes.io/role/elb" = "1"
   }
 }
 
-# 4. Private Subnets (For EKS Nodes)
+# Creates private subnets for EKS nodes with internal ELB role tag
 resource "aws_subnet" "private" {
   count             = length(var.private_subnets)
   vpc_id            = aws_vpc.main.id
@@ -48,31 +47,29 @@ resource "aws_subnet" "private" {
 
   tags = {
     Name                              = "${var.project_name}-private-${count.index + 1}"
-    "kubernetes.io/role/internal-elb" = "1" # Required for Internal ALBs
+    "kubernetes.io/role/internal-elb" = "1"
   }
 }
 
-# 5. NAT Gateway (Single one for cost savings in Lab)
-# Created conditionally and after EKS cluster to minimize costs during cluster creation
+# Allocates EIP for NAT Gateway
 resource "aws_eip" "nat" {
   count  = var.create_nat_gateway ? 1 : 0
   domain = "vpc"
   tags   = { Name = "${var.project_name}-nat-eip" }
 }
 
+# Creates NAT Gateway in public subnet to provide internet access for private subnets
 resource "aws_nat_gateway" "main" {
   count         = var.create_nat_gateway ? 1 : 0
   allocation_id = aws_eip.nat[0].id
-  subnet_id     = aws_subnet.public[0].id # NAT lives in Public
+  subnet_id     = aws_subnet.public[0].id
 
-  # NAT Gateway can be created after EKS cluster control plane to save costs
-  # Nodes will be created after NAT Gateway is ready
   depends_on = [aws_eip.nat, aws_subnet.public, aws_internet_gateway.main]
 
   tags = { Name = "${var.project_name}-nat" }
 }
 
-# 6. Route Tables
+# Routes public subnet traffic through internet gateway
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
   route {
@@ -85,6 +82,7 @@ resource "aws_route_table" "public" {
   tags = { Name = "${var.project_name}-public-rt" }
 }
 
+# Routes private subnet traffic through NAT Gateway when enabled
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
   dynamic "route" {
@@ -100,7 +98,7 @@ resource "aws_route_table" "private" {
   tags = { Name = "${var.project_name}-private-rt" }
 }
 
-# 7. Route Associations
+# Associates public subnets with public route table
 resource "aws_route_table_association" "public" {
   count          = length(var.public_subnets)
   subnet_id      = aws_subnet.public[count.index].id
@@ -109,6 +107,7 @@ resource "aws_route_table_association" "public" {
   depends_on = [aws_subnet.public, aws_route_table.public]
 }
 
+# Associates private subnets with private route table
 resource "aws_route_table_association" "private" {
   count          = length(var.private_subnets)
   subnet_id      = aws_subnet.private[count.index].id
