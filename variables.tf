@@ -16,50 +16,40 @@ variable "region" {
   default     = "us-east-1"
 }
 
-variable "cluster_iam_role_arn" {
-  description = "ARN of existing IAM role to use for EKS cluster. Leave empty to let module create one (requires iam:PassRole permission). Useful if you have pre-created roles with specific policies."
+# IAM Role ARNs are now hardcoded in main.tf using data.aws_caller_identity.current.account_id
+# No variables needed for IAM roles - they are automatically constructed
+
+variable "okta_org_name" {
+  description = "Okta org slug (e.g., dev-123456). Found in your Okta admin URL: https://YOUR_ORG.okta.com. IMPORTANT: Do NOT include '-admin' - use just the org name (e.g., 'integrator-4772467' not 'integrator-4772467-admin')"
   type        = string
-  default     = null
+  default     = ""
+
+  validation {
+    condition     = !var.enable_identity || length(trimspace(var.okta_org_name)) > 0
+    error_message = "okta_org_name must be set when enable_identity is true."
+  }
+  
+  validation {
+    condition     = !var.enable_identity || !can(regex("-admin$", var.okta_org_name))
+    error_message = "okta_org_name should NOT include '-admin'. Use just the org name (e.g., 'integrator-4772467' not 'integrator-4772467-admin')."
+  }
 }
 
-variable "node_group_iam_role_arn" {
-  description = "ARN of existing IAM role to use for EKS node groups. If not provided, module will create one automatically. In production, cluster and node group roles should be separate."
+variable "okta_api_token" {
+  description = "API token for the Okta org. Create one in Okta Admin > Security > API > Tokens"
   type        = string
-  default     = null
+  default     = ""
+  sensitive   = true
+
+  validation {
+    condition     = !var.enable_identity || length(trimspace(var.okta_api_token)) > 0
+    error_message = "okta_api_token must be set when enable_identity is true."
+  }
 }
 
-variable "create_nat_gateway" {
-  description = "Whether to create NAT Gateway. Set to false to create EKS cluster first (saves costs during cluster creation), then set to true and apply again. Default: true (creates immediately)."
+variable "enable_identity" {
+  description = "Feature flag to control whether the Okta identity module is applied."
   type        = bool
-  default     = true
+  default     = false
 }
-
-# variable "okta_org_name" {
-#   description = "Okta org slug (e.g., dev-123456). Optional for local runs without identity provisioning."
-#   type        = string
-#   default     = ""
-#
-#   validation {
-#     condition     = !var.enable_identity || length(trim(var.okta_org_name)) > 0
-#     error_message = "okta_org_name must be set when enable_identity is true."
-#   }
-# }
-#
-# variable "okta_api_token" {
-#   description = "API token for the Okta org. Leave empty to skip the identity module."
-#   type        = string
-#   default     = ""
-#   sensitive   = true
-#
-#   validation {
-#     condition     = !var.enable_identity || length(trim(var.okta_api_token)) > 0
-#     error_message = "okta_api_token must be set when enable_identity is true."
-#   }
-# }
-#
-# variable "enable_identity" {
-#   description = "Feature flag to control whether the Okta identity module is applied."
-#   type        = bool
-#   default     = false
-# }
 
