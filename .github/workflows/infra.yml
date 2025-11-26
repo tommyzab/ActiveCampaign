@@ -49,10 +49,12 @@ jobs:
           OKTA_ORG: ${{ secrets.OKTA_ORG_NAME }}
         run: |
           # Export Okta secrets if present, otherwise use dummy values to satisfy provider validation
+          # Note: Dummy values are only used when enable_identity is false, so provider won't actually connect
           if [[ -n "${OKTA_TOKEN}" ]]; then
             echo "TF_VAR_okta_api_token=${OKTA_TOKEN}" >> "$GITHUB_ENV"
           else
-            echo "TF_VAR_okta_api_token=dummy-token-for-validation" >> "$GITHUB_ENV"
+            # Use a long dummy token that looks valid (Okta tokens are typically 40+ characters)
+            echo "TF_VAR_okta_api_token=00DummyTokenForValidationWhenIdentityDisabled1234567890abcdef" >> "$GITHUB_ENV"
           fi
           if [[ -n "${OKTA_ORG}" ]]; then
             echo "TF_VAR_okta_org_name=${OKTA_ORG}" >> "$GITHUB_ENV"
