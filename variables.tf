@@ -23,16 +23,7 @@ variable "okta_org_name" {
   description = "Okta org slug (e.g., dev-123456). Found in your Okta admin URL: https://YOUR_ORG.okta.com. IMPORTANT: Do NOT include '-admin' - use just the org name (e.g., 'integrator-4772467' not 'integrator-4772467-admin')"
   type        = string
   default     = ""
-
-  validation {
-    condition     = !var.enable_identity || length(trimspace(var.okta_org_name)) > 0
-    error_message = "okta_org_name must be set when enable_identity is true."
-  }
-  
-  validation {
-    condition     = !var.enable_identity || !can(regex("-admin$", var.okta_org_name))
-    error_message = "okta_org_name should NOT include '-admin'. Use just the org name (e.g., 'integrator-4772467' not 'integrator-4772467-admin')."
-  }
+  # Note: Validation is done via precondition in main.tf (variable validation cannot reference other variables)
 }
 
 variable "okta_api_token" {
@@ -40,11 +31,7 @@ variable "okta_api_token" {
   type        = string
   default     = ""
   sensitive   = true
-
-  validation {
-    condition     = !var.enable_identity || length(trimspace(var.okta_api_token)) > 0
-    error_message = "okta_api_token must be set when enable_identity is true."
-  }
+  # Note: Validation is done via precondition in main.tf (variable validation cannot reference other variables)
 }
 
 variable "enable_identity" {

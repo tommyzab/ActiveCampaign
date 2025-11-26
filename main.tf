@@ -29,6 +29,22 @@ locals {
   ]
 }
 
+# Validate Okta configuration when identity is enabled
+# This precondition ensures required Okta variables are set when enable_identity is true
+resource "terraform_data" "validate_okta_config" {
+  lifecycle {
+    precondition {
+      # If identity is enabled, org name and token must NOT be empty
+      condition = !var.enable_identity || (
+        length(trimspace(var.okta_org_name)) > 0 && 
+        length(trimspace(var.okta_api_token)) > 0 &&
+        !can(regex("-admin$", var.okta_org_name))
+      )
+      error_message = "When enable_identity is true, you must provide okta_org_name (without '-admin') and okta_api_token."
+    }
+  }
+}
+
 # Deploy EKS Cluster
 module "eks" {
   source = "./modules/eks"
@@ -54,5 +70,5 @@ module "identity" {
 
   eks_oidc_url = module.eks.cluster_oidc_issuer_url
 
-  depends_on = [module.eks]
+  depends_on = [module.eks, terraform_data.validate_okta_config]
 }
