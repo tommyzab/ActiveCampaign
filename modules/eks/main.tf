@@ -18,18 +18,18 @@ module "eks" {
   enable_irsa = true
 
   # CloudWatch logging disabled
-  cluster_enabled_log_types              = []
-  create_cloudwatch_log_group            = false
+  cluster_enabled_log_types   = []
+  create_cloudwatch_log_group = false
 
   # KMS encryption disabled
-  create_kms_key = false
+  create_kms_key            = false
   cluster_encryption_config = {}
 
   # Access entries disabled
   # access_entries = {}
 
   eks_managed_node_groups = {}
-  
+
 
   self_managed_node_groups = {}
 

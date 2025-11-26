@@ -64,11 +64,11 @@ resource "aws_nat_gateway" "main" {
   count         = var.create_nat_gateway ? 1 : 0
   allocation_id = aws_eip.nat[0].id
   subnet_id     = aws_subnet.public[0].id # NAT lives in Public
-  
+
   # NAT Gateway can be created after EKS cluster control plane to save costs
   # Nodes will be created after NAT Gateway is ready
   depends_on = [aws_eip.nat, aws_subnet.public, aws_internet_gateway.main]
-  
+
   tags = { Name = "${var.project_name}-nat" }
 }
 
@@ -79,9 +79,9 @@ resource "aws_route_table" "public" {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.main.id
   }
-  
+
   depends_on = [aws_vpc.main, aws_internet_gateway.main]
-  
+
   tags = { Name = "${var.project_name}-public-rt" }
 }
 
@@ -94,9 +94,9 @@ resource "aws_route_table" "private" {
       nat_gateway_id = aws_nat_gateway.main[0].id
     }
   }
-  
+
   depends_on = [aws_vpc.main, aws_nat_gateway.main]
-  
+
   tags = { Name = "${var.project_name}-private-rt" }
 }
 

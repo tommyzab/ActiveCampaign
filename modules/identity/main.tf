@@ -26,10 +26,10 @@ resource "okta_app_oauth" "eks_client" {
   label          = "EKS Cluster Access"
   type           = "native"
   grant_types    = ["authorization_code", "refresh_token"]
-  response_types = ["code"]  # Authorization code flow - id_token is obtained after code exchange
-  
-  redirect_uris  = ["http://localhost:8000/callback", "http://localhost:18000/callback"]
-  
+  response_types = ["code"] # Authorization code flow - id_token is obtained after code exchange
+
+  redirect_uris = ["http://localhost:8000/callback", "http://localhost:18000/callback"]
+
   # REMOVED: groups = [...] (This caused the error)
 }
 

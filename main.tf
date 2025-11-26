@@ -36,7 +36,7 @@ resource "terraform_data" "validate_okta_config" {
     precondition {
       # If identity is enabled, org name and token must NOT be empty
       condition = !var.enable_identity || (
-        length(trimspace(var.okta_org_name)) > 0 && 
+        length(trimspace(var.okta_org_name)) > 0 &&
         length(trimspace(var.okta_api_token)) > 0 &&
         !can(regex("-admin$", var.okta_org_name))
       )
@@ -51,7 +51,7 @@ module "eks" {
 
   project_name = var.project_name
   environment  = var.environment
-  cluster_name = "demo-eks" 
+  cluster_name = "demo-eks"
 
   # Use Default VPC and Default Subnets (filtered to exclude us-east-1e)
   vpc_id             = data.aws_vpc.default.id
