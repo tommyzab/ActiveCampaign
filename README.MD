@@ -2,6 +2,8 @@
 
 This repository demonstrates how I would bootstrap, govern, and continuously deliver changes to an AWS EKS foundation that is tightly integrated with Okta. The emphasis is on design clarity, repeatability, and the ability to extend into a production-grade platform once proper tenants/secrets are available.
 
+> **Note:** This repository includes a GitHub Actions CI/CD pipeline that runs on every push to `main` branch.
+
 ## 🧠 Architecture & Design Decisions
 
 1. **Identity Management Strategy (Infrastructure vs. Identity)**  
