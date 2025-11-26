@@ -1,54 +1,58 @@
 # main.tf
 
-# 1. Deploy Networking (The Foundation)
-module "network" {
-  source = "./modules/network"
+# Data sources for default VPC and subnets
+data "aws_caller_identity" "current" {}
 
-  project_name = var.project_name
-  environment  = var.environment
-
-  vpc_cidr        = "10.0.0.0/16"
-  azs             = ["us-east-1a", "us-east-1b"]
-  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
-  private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
-  
-  # Delay NAT Gateway creation until after EKS cluster (cost optimization)
-  # Set to false to create cluster first, then manually enable NAT Gateway later
-  create_nat_gateway = var.create_nat_gateway
+data "aws_vpc" "default" {
+  default = true
 }
 
-# 2. Deploy Compute (EKS Cluster)
+# Get all default subnets
+data "aws_subnets" "default" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
+}
+
+# Get subnet details to filter out us-east-1e
+data "aws_subnet" "default" {
+  for_each = toset(data.aws_subnets.default.ids)
+  id       = each.value
+}
+
+# Filter subnets to exclude us-east-1e
+locals {
+  default_subnet_ids = [
+    for subnet in data.aws_subnet.default :
+    subnet.id if subnet.availability_zone != "us-east-1e"
+  ]
+}
+
+# Deploy EKS Cluster
 module "eks" {
   source = "./modules/eks"
 
   project_name = var.project_name
   environment  = var.environment
-  cluster_name = "${var.project_name}-cluster"
+  cluster_name = "demo-eks" 
 
-  # Connect to Networking Module
-  vpc_id             = module.network.vpc_id
-  private_subnet_ids = module.network.private_subnet_ids
+  # Use Default VPC and Default Subnets (filtered to exclude us-east-1e)
+  vpc_id             = data.aws_vpc.default.id
+  private_subnet_ids = local.default_subnet_ids
 
-  # Optional: Use existing IAM role (useful if you have pre-created roles)
-  # If not provided, module will create one (requires iam:PassRole permission)
-  cluster_iam_role_arn = var.cluster_iam_role_arn
-  
-  # Optional: Use existing IAM role for node groups
-  # If not provided, module will create one automatically
-  node_group_iam_role_arn = var.node_group_iam_role_arn
-
-  # Explicit dependency to ensure network is fully provisioned before EKS
-  depends_on = [module.network]
+  # Hardcoded IAM Role ARNs (must exist in the account)
+  cluster_iam_role_arn    = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/eksClusterRole"
+  node_group_iam_role_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/eksNodeRole"
 }
 
 # 3. Deploy Identity (Okta Configuration)
 # Enabled via var.enable_identity to keep local testing simple.
-# NOTE: Commented out for local testing - Okta Developer platform requires corporate email validation
-# module "identity" {
-#   count  = var.enable_identity ? 1 : 0
-#   source = "./modules/identity"
-#
-#   eks_oidc_url = module.eks.cluster_oidc_issuer_url
-#
-#   depends_on = [module.eks]
-# }
+module "identity" {
+  count  = var.enable_identity ? 1 : 0
+  source = "./modules/identity"
+
+  eks_oidc_url = module.eks.cluster_oidc_issuer_url
+
+  depends_on = [module.eks]
+}
