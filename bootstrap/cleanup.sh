@@ -93,7 +93,43 @@ else
     echo "   -> errored.tfstate doesn't exist. Skipping."
 fi
 
+# 4. Delete EC2 Key Pair (created by setup.sh, not managed by Terraform)
+echo ""
+echo "4. Deleting EC2 Key Pair..."
+KEYPAIR_NAME="okta-eks-nodes-keypair"
+if aws ec2 describe-key-pairs --key-names "$KEYPAIR_NAME" --region "$REGION" 2>/dev/null | grep -q "$KEYPAIR_NAME"; then
+    aws ec2 delete-key-pair \
+        --key-name "$KEYPAIR_NAME" \
+        --region "$REGION" 2>/dev/null || echo "   -> Error deleting key pair (may not exist or in use)"
+    echo "   -> Key pair deleted."
+else
+    echo "   -> Key pair doesn't exist. Skipping."
+fi
+
+# 5. Delete local keypair file and helper script
+echo ""
+echo "5. Cleaning up local helper files..."
+
+if [ -f "${KEYPAIR_NAME}.pem" ]; then
+    rm -f "${KEYPAIR_NAME}.pem"
+    echo "   -> Deleted ${KEYPAIR_NAME}.pem"
+else
+    echo "   -> ${KEYPAIR_NAME}.pem doesn't exist. Skipping."
+fi
+
+if [ -f "get-cluster-sg.sh" ]; then
+    rm -f get-cluster-sg.sh
+    echo "   -> Deleted get-cluster-sg.sh"
+else
+    echo "   -> get-cluster-sg.sh doesn't exist. Skipping."
+fi
+
+echo ""
 echo "====== CLEANUP COMPLETE ======"
-echo "All backend resources and local Terraform files have been removed."
+echo "All backend resources, EC2 keypair, and local files have been removed."
+echo ""
+echo "Note: If you ran 'terraform destroy' first, all Terraform-managed resources"
+echo "      (EKS cluster, security groups, etc.) have also been destroyed."
+echo ""
 echo "Run './bootstrap/setup.sh' to recreate the backend when ready."
 
