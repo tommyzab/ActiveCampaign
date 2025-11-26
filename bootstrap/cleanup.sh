@@ -86,6 +86,13 @@ else
     echo "   -> .terraform.lock.hcl doesn't exist. Skipping."
 fi
 
+if [ -f "errored.tfstate" ]; then
+    rm -f errored.tfstate
+    echo "   -> Deleted errored.tfstate"
+else
+    echo "   -> errored.tfstate doesn't exist. Skipping."
+fi
+
 echo "====== CLEANUP COMPLETE ======"
 echo "All backend resources and local Terraform files have been removed."
 echo "Run './bootstrap/setup.sh' to recreate the backend when ready."
