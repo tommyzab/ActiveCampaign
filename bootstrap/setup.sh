@@ -42,7 +42,70 @@ else
     fi
 fi
 
-echo "4. Generating backend.tf..."
+echo "4. Creating Security Group for EKS nodes..."
+SG_NAME="okta-eks-nodes-sg"
+# Get default VPC ID
+DEFAULT_VPC_ID=$(aws ec2 describe-vpcs \
+    --filters "Name=isDefault,Values=true" \
+    --region "$REGION" \
+    --query 'Vpcs[0].VpcId' \
+    --output text 2>/dev/null)
+
+if [ -z "$DEFAULT_VPC_ID" ] || [ "$DEFAULT_VPC_ID" == "None" ]; then
+    echo "   -> Warning: Could not find default VPC. Skipping security group creation."
+    NODE_SG_ID=""
+else
+    # Check if security group already exists
+    EXISTING_SG=$(aws ec2 describe-security-groups \
+        --filters "Name=group-name,Values=$SG_NAME" "Name=vpc-id,Values=$DEFAULT_VPC_ID" \
+        --region "$REGION" \
+        --query 'SecurityGroups[0].GroupId' \
+        --output text 2>/dev/null)
+    
+    if [ -n "$EXISTING_SG" ] && [ "$EXISTING_SG" != "None" ]; then
+        echo "   -> Security group '$SG_NAME' already exists: $EXISTING_SG"
+        NODE_SG_ID="$EXISTING_SG"
+    else
+        # Create security group
+        NODE_SG_ID=$(aws ec2 create-security-group \
+            --group-name "$SG_NAME" \
+            --description "Security group for EKS node groups (created by setup.sh)" \
+            --vpc-id "$DEFAULT_VPC_ID" \
+            --region "$REGION" \
+            --query 'GroupId' \
+            --output text 2>/dev/null)
+        
+        if [ -n "$NODE_SG_ID" ] && [ "$NODE_SG_ID" != "None" ]; then
+            echo "   -> Security group created: $NODE_SG_ID"
+            
+            # Add inbound rules for EKS nodes
+            # Allow all traffic from itself (node-to-node communication)
+            aws ec2 authorize-security-group-ingress \
+                --group-id "$NODE_SG_ID" \
+                --protocol -1 \
+                --source-group "$NODE_SG_ID" \
+                --region "$REGION" 2>/dev/null || echo "   -> Warning: Could not add self-referencing rule"
+            
+            # Allow SSH access (port 22) - you can restrict this to specific IPs if needed
+            aws ec2 authorize-security-group-ingress \
+                --group-id "$NODE_SG_ID" \
+                --protocol tcp \
+                --port 22 \
+                --cidr 0.0.0.0/0 \
+                --region "$REGION" 2>/dev/null || echo "   -> Warning: Could not add SSH rule"
+            
+            # Allow HTTPS outbound (for pulling images, etc.) - already allowed by default, but explicit is better
+            # Note: Outbound is allowed by default, so we don't need to add explicit rules
+            
+            echo "   -> Security group rules configured"
+        else
+            echo "   -> Warning: Could not create security group (may need permissions). Continuing..."
+            NODE_SG_ID=""
+        fi
+    fi
+fi
+
+echo "5. Generating backend.tf..."
 cat > backend.tf <<EOF
 terraform {
   backend "s3" {
@@ -55,7 +118,7 @@ terraform {
 }
 EOF
 
-echo "5. Creating helper script to get cluster security group ID..."
+echo "6. Creating helper script to get cluster security group ID..."
 cat > get-cluster-sg.sh <<'HELPER_EOF'
 #!/bin/bash
 # Helper script to get the EKS cluster security group ID after terraform apply
@@ -103,11 +166,55 @@ fi
 echo ""
 echo "Cluster Security Group ID: $CLUSTER_SG_ID"
 echo ""
+
+# Also update the node security group to allow traffic from cluster SG
+NODE_SG_NAME="okta-eks-nodes-sg"
+REGION="${2:-us-east-1}"
+DEFAULT_VPC_ID=$(aws ec2 describe-vpcs \
+    --filters "Name=isDefault,Values=true" \
+    --region "$REGION" \
+    --query 'Vpcs[0].VpcId' \
+    --output text 2>/dev/null)
+
+if [ -n "$DEFAULT_VPC_ID" ] && [ "$DEFAULT_VPC_ID" != "None" ]; then
+    NODE_SG_ID=$(aws ec2 describe-security-groups \
+        --filters "Name=group-name,Values=$NODE_SG_NAME" "Name=vpc-id,Values=$DEFAULT_VPC_ID" \
+        --region "$REGION" \
+        --query 'SecurityGroups[0].GroupId' \
+        --output text 2>/dev/null)
+    
+    if [ -n "$NODE_SG_ID" ] && [ "$NODE_SG_ID" != "None" ]; then
+        echo "Updating node security group ($NODE_SG_ID) to allow traffic from cluster..."
+        # Check if rule already exists
+        EXISTING_RULE=$(aws ec2 describe-security-group-rules \
+            --filters "Name=group-id,Values=$NODE_SG_ID" "Name=referenced-group-info.group-id,Values=$CLUSTER_SG_ID" \
+            --region "$REGION" \
+            --query 'SecurityGroupRules[0].SecurityGroupRuleId' \
+            --output text 2>/dev/null)
+        
+        if [ -z "$EXISTING_RULE" ] || [ "$EXISTING_RULE" == "None" ]; then
+            # Add rule to allow all traffic from cluster security group
+            aws ec2 authorize-security-group-ingress \
+                --group-id "$NODE_SG_ID" \
+                --protocol -1 \
+                --source-group "$CLUSTER_SG_ID" \
+                --region "$REGION" 2>/dev/null && echo "   -> Added rule: Allow all traffic from cluster SG"
+        else
+            echo "   -> Rule already exists (traffic from cluster SG already allowed)"
+        fi
+    fi
+fi
+
+echo ""
 echo "Use this in your CloudFormation stack parameters:"
 echo "  ClusterSecurityGroupId: $CLUSTER_SG_ID"
+echo "  NodeSecurityGroupId: $NODE_SG_ID"
 echo ""
-echo "Or export it:"
+echo "Or export them:"
 echo "  export CLUSTER_SG_ID=$CLUSTER_SG_ID"
+if [ -n "$NODE_SG_ID" ] && [ "$NODE_SG_ID" != "None" ]; then
+    echo "  export NODE_SG_ID=$NODE_SG_ID"
+fi
 HELPER_EOF
 chmod +x get-cluster-sg.sh
 echo "   -> Created get-cluster-sg.sh helper script"
@@ -121,11 +228,23 @@ if aws ec2 describe-key-pairs --key-names "$KEYPAIR_NAME" --region "$REGION" 2>/
 else
     echo "   -> EC2 Key Pair: $KEYPAIR_NAME (creation may have been skipped)"
 fi
+if [ -n "$NODE_SG_ID" ] && [ "$NODE_SG_ID" != "None" ]; then
+    echo "   -> Security Group: $NODE_SG_ID ($SG_NAME)"
+else
+    echo "   -> Security Group: (creation may have been skipped)"
+fi
 
 echo ""
 echo "====== SUCCESS ======"
-echo "Backend created! Next steps:"
+echo "Backend created! Resources ready for CloudFormation:"
+if [ -n "$NODE_SG_ID" ] && [ "$NODE_SG_ID" != "None" ]; then
+    echo "  - Node Security Group ID: $NODE_SG_ID"
+fi
+echo "  - Key Pair Name: $KEYPAIR_NAME"
+echo ""
+echo "Next steps:"
 echo "  1. Run: terraform init"
 echo "  2. Run: terraform apply"
-echo "  3. After cluster is created, run: ./get-cluster-sg.sh demo-eks"
-echo "  4. Use the security group ID and keypair '$KEYPAIR_NAME' in your CloudFormation stack"
+echo "  3. After cluster is created, update the node security group to allow traffic from cluster SG:"
+echo "     ./get-cluster-sg.sh demo-eks"
+echo "  4. Use the security group ID ($NODE_SG_ID) and keypair '$KEYPAIR_NAME' in your CloudFormation stack"

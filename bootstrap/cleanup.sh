@@ -110,10 +110,42 @@ else
     echo "   -> Key pair doesn't exist. Skipping."
 fi
 
-# Delete local keypair file and helper script
+# Delete Security Group (created by setup.sh, not managed by Terraform)
 STEP_NUM=$([ "$BACKEND_EXISTS" = true ] && echo "5" || echo "3")
 echo ""
-echo "${STEP_NUM}. Cleaning up local helper files..."
+echo "${STEP_NUM}. Deleting Security Group..."
+SG_NAME="okta-eks-nodes-sg"
+# Get default VPC ID
+DEFAULT_VPC_ID=$(aws ec2 describe-vpcs \
+    --filters "Name=isDefault,Values=true" \
+    --region "$REGION" \
+    --query 'Vpcs[0].VpcId' \
+    --output text 2>/dev/null)
+
+if [ -n "$DEFAULT_VPC_ID" ] && [ "$DEFAULT_VPC_ID" != "None" ]; then
+    NODE_SG_ID=$(aws ec2 describe-security-groups \
+        --filters "Name=group-name,Values=$SG_NAME" "Name=vpc-id,Values=$DEFAULT_VPC_ID" \
+        --region "$REGION" \
+        --query 'SecurityGroups[0].GroupId' \
+        --output text 2>/dev/null)
+    
+    if [ -n "$NODE_SG_ID" ] && [ "$NODE_SG_ID" != "None" ]; then
+        # Delete security group (will fail if still in use, which is expected)
+        aws ec2 delete-security-group \
+            --group-id "$NODE_SG_ID" \
+            --region "$REGION" 2>/dev/null || echo "   -> Error deleting security group (may be in use by running instances)"
+        echo "   -> Security group deleted."
+    else
+        echo "   -> Security group doesn't exist. Skipping."
+    fi
+else
+    echo "   -> Could not find default VPC. Skipping security group deletion."
+fi
+
+# Delete local keypair file (keep helper script as it's useful)
+STEP_NUM=$([ "$BACKEND_EXISTS" = true ] && echo "6" || echo "4")
+echo ""
+echo "${STEP_NUM}. Cleaning up local keypair file..."
 
 if [ -f "${KEYPAIR_NAME}.pem" ]; then
     rm -f "${KEYPAIR_NAME}.pem"
@@ -122,12 +154,7 @@ else
     echo "   -> ${KEYPAIR_NAME}.pem doesn't exist. Skipping."
 fi
 
-if [ -f "get-cluster-sg.sh" ]; then
-    rm -f get-cluster-sg.sh
-    echo "   -> Deleted get-cluster-sg.sh"
-else
-    echo "   -> get-cluster-sg.sh doesn't exist. Skipping."
-fi
+# Note: get-cluster-sg.sh is kept as it's a useful helper script
 
 echo ""
 echo "====== CLEANUP COMPLETE ======"
