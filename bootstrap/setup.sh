@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e # Stop script immediately on first error
 
+# Disable AWS CLI pager to prevent interactive prompts
+export AWS_PAGER=""
+
 # Generate a unique name using timestamp to ensure uniqueness
 UNIQUE_ID=$(date +%s)
 BUCKET_NAME="okta-eks-state-$UNIQUE_ID"

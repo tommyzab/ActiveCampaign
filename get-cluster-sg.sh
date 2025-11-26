@@ -2,6 +2,9 @@
 # Helper script to get the EKS cluster security group ID after terraform apply
 # This is needed for CloudFormation stack that creates unmanaged node groups
 
+# Disable AWS CLI pager to prevent interactive prompts
+export AWS_PAGER=""
+
 CLUSTER_NAME="${1:-demo-eks}"
 REGION="${2:-us-east-1}"
 
@@ -71,16 +74,12 @@ if [ -n "$DEFAULT_VPC_ID" ] && [ "$DEFAULT_VPC_ID" != "None" ]; then
             --output text 2>/dev/null)
         
         if [ -z "$EXISTING_RULE" ] || [ "$EXISTING_RULE" == "None" ]; then
-            # Add rule to allow traffic from cluster security group
-            # EKS requires:
-            # - Port 443 (HTTPS) from control plane to nodes
-            # - Port 10250 (kubelet) from nodes to control plane (handled by cluster SG)
-            # - All traffic for node-to-cluster communication
+            # Add rule to allow all traffic from cluster security group
             aws ec2 authorize-security-group-ingress \
                 --group-id "$NODE_SG_ID" \
                 --protocol -1 \
                 --source-group "$CLUSTER_SG_ID" \
-                --region "$REGION" 2>/dev/null && echo "   -> Added rule: Allow all traffic from cluster SG (ports 443, 10250, etc.)"
+                --region "$REGION" 2>/dev/null && echo "   -> Added rule: Allow all traffic from cluster SG"
         else
             echo "   -> Rule already exists (traffic from cluster SG already allowed)"
         fi

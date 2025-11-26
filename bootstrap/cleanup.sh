@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e # Stop script immediately on first error
 
+# Disable AWS CLI pager to prevent interactive prompts
+export AWS_PAGER=""
+
 REGION="us-east-1"
 
 # Change to project root directory
