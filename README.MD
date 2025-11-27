@@ -25,15 +25,12 @@ This repository contains Terraform configurations for setting up a production-gr
 - kubectl
 - Okta admin account with API token access
 - GitHub repository with Actions enabled
-- IAM user with permissions (see `iam-policy-terraform-user.json`)
+- IAM user with appropriate AWS permissions
 
 ## Project Structure
 
 ```
 .
-├── bootstrap/              # State management and infrastructure setup
-│   ├── setup.sh          # Creates S3 backend, DynamoDB table, EC2 keypair, security groups
-│   └── cleanup.sh        # Removes backend resources and local files
 ├── modules/
 │   ├── eks/              # EKS cluster configuration
 │   │   ├── main.tf       # Cluster definition with IRSA enabled
@@ -58,22 +55,13 @@ This repository contains Terraform configurations for setting up a production-gr
 
 ## Getting Started
 
-### 1. Bootstrap the State Management Infrastructure
+### 1. Configure Terraform Backend
 
-The bootstrap script creates the necessary backend resources (S3 bucket, DynamoDB table) and prepares the environment:
+Set up your Terraform backend configuration. You'll need:
+- An S3 bucket for storing Terraform state
+- A DynamoDB table for state locking
 
-```bash
-cd bootstrap
-./setup.sh
-cd ..
-```
-
-This script will:
-- Create a unique S3 bucket for Terraform state
-- Create a DynamoDB table for state locking
-- Generate `backend.tf` with the backend configuration
-- Create EC2 keypair for EKS nodes
-- Create security group for EKS nodes
+Configure your backend in a `backend.tf` file or via backend configuration flags.
 
 ### 2. Configure GitHub Secrets
 
@@ -82,8 +70,8 @@ Set the following secrets in your GitHub repository (Settings → Secrets and va
 **Required:**
 - `AWS_ACCESS_KEY_ID` - AWS access key for deployment
 - `AWS_SECRET_ACCESS_KEY` - AWS secret access key
-- `TF_STATE_BUCKET` - S3 bucket name (from `setup.sh` output)
-- `TF_STATE_TABLE` - DynamoDB table name (from `setup.sh` output)
+- `TF_STATE_BUCKET` - S3 bucket name for Terraform state
+- `TF_STATE_TABLE` - DynamoDB table name for state locking
 
 **Optional (for Okta integration):**
 - `OKTA_API_TOKEN` - Okta API token
@@ -167,8 +155,6 @@ The state management infrastructure includes:
 - **Access Control**: IAM-based access policies
 - **Backend Isolation**: Unique bucket/table per environment
 
-The bootstrap script (`setup.sh`) automatically configures these security features when creating the backend.
-
 ## Cost Optimization
 
 This configuration is optimized for cost efficiency:
@@ -225,7 +211,8 @@ The GitHub Actions workflow (`.github/workflows/infra.yml`) provides:
 ### Common Issues
 
 **Terraform Backend Not Found**
-- Run `./bootstrap/setup.sh` to create the backend infrastructure
+- Ensure your S3 bucket and DynamoDB table are configured correctly
+- Verify backend configuration in your Terraform setup
 
 **Okta Provider Validation Errors**
 - Ensure `ENABLE_IDENTITY` secret is set to `true` if using Okta
@@ -234,7 +221,7 @@ The GitHub Actions workflow (`.github/workflows/infra.yml`) provides:
 
 **EKS Cluster Creation Fails**
 - Verify IAM roles exist: `eksClusterRole` and `eksNodeRole`
-- Check IAM permissions (see `iam-policy-terraform-user.json`)
+- Check IAM permissions for EKS cluster and node group creation
 - Ensure default VPC and subnets exist in the region
 
 **Node Group Creation**
@@ -247,14 +234,11 @@ To remove all resources:
 
 ```bash
 terraform destroy
-cd bootstrap
-./cleanup.sh
 ```
 
 This will:
 - Destroy all Terraform-managed resources
-- Remove S3 bucket and DynamoDB table
-- Delete EC2 keypair and security groups
+- Remove S3 bucket and DynamoDB table (if managed by Terraform)
 - Clean up local Terraform files
 
 ## License
