@@ -42,7 +42,7 @@ This repository contains Terraform configurations for setting up a production-gr
 │   │   ├── variables.tf  # Module variables
 │   │   └── outputs.tf    # Group IDs, client IDs, OIDC URLs
 │   └── network/          # Network resources (currently using default VPC)
-│       ├── main.tf        # VPC, subnets, NAT Gateway (optional)
+│       ├── main.tf        # VPC, subnets, NAT Gateway
 │       ├── variables.tf  # Module variables
 │       └── outputs.tf    # VPC and subnet IDs
 ├── main.tf                # Main infrastructure orchestration
