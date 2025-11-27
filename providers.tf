@@ -10,9 +10,9 @@ provider "aws" {
   region = var.region
 }
 
-# Uses dummy values when identity disabled to prevent provider validation errors during init
+# Uses actual Okta variables - no dummy tokens
 provider "okta" {
-  org_name  = var.enable_identity ? var.okta_org_name : "dev-000000"
+  org_name  = var.okta_org_name
   base_url  = "okta.com"
-  api_token = var.enable_identity ? var.okta_api_token : "00DummyTokenForValidationWhenIdentityDisabled1234567890abcdef"
+  api_token = var.okta_api_token
 }

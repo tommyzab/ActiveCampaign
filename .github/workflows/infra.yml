@@ -48,9 +48,9 @@ jobs:
           OKTA_TOKEN: ${{ secrets.OKTA_API_TOKEN }}
           OKTA_ORG: ${{ secrets.OKTA_ORG_NAME }}
         run: |
-          # Export Okta secrets (use dummy values if missing and identity is disabled)
-          echo "TF_VAR_okta_api_token=${OKTA_TOKEN:-00DummyTokenForValidationWhenIdentityDisabled1234567890abcdef}" >> "$GITHUB_ENV"
-          echo "TF_VAR_okta_org_name=${OKTA_ORG:-dummy-org}" >> "$GITHUB_ENV"
+          # Export Okta secrets directly (no dummy values)
+          echo "TF_VAR_okta_api_token=${OKTA_TOKEN}" >> "$GITHUB_ENV"
+          echo "TF_VAR_okta_org_name=${OKTA_ORG}" >> "$GITHUB_ENV"
           # Enable identity module if ENABLE_IDENTITY secret is set to 'true'
           echo "TF_VAR_enable_identity=${{ secrets.ENABLE_IDENTITY != '' && secrets.ENABLE_IDENTITY || 'false' }}" >> "$GITHUB_ENV"
 
