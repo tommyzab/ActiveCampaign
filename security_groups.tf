@@ -35,6 +35,7 @@ locals {
   node_security_group_id = aws_security_group.eks_nodes.id
 }
 
+# Allows EKS control plane to communicate with worker nodes (required for cluster operations)
 resource "aws_security_group_rule" "cluster_to_nodes" {
   type                     = "ingress"
   from_port                = 0
