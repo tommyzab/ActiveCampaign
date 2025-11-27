@@ -13,7 +13,6 @@ on:
 
 permissions:
   contents: read
-  # id-token: write # Removed: Only needed for OIDC, not needed for Access Keys
 
 env:
   AWS_REGION: us-east-1
@@ -36,7 +35,6 @@ jobs:
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
-      # --- FIXED: Using Access Keys instead of Role Assumption ---
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -174,9 +172,6 @@ jobs:
   apply:
     name: Terraform Apply
     needs: plan
-    # Auto-deploy on push to main (suitable for home assignments/testing)
-    # For production, consider requiring manual approval via workflow_dispatch
-    # Only run if plan job succeeded AND a plan file was actually created
     if: >-
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
@@ -194,7 +189,6 @@ jobs:
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
-      # --- FIXED: Using Access Keys instead of Role Assumption ---
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
