@@ -71,6 +71,7 @@ jobs:
         run: terraform validate
 
       - name: Terraform Plan
+        id: terraform_plan
         # Handle Okta provider validation errors gracefully when identity is disabled
         continue-on-error: ${{ secrets.ENABLE_IDENTITY != 'true' }}
         env:
@@ -103,18 +104,31 @@ jobs:
             exit $PLAN_EXIT
           fi
 
+      - name: Check Plan File Exists
+        id: check_plan
+        if: always()
+        run: |
+          if [[ -f tfplan.binary ]]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Upload Plan Artifact
+        if: steps.terraform_plan.outcome == 'success' && steps.check_plan.outputs.exists == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: tfplan
           path: tfplan.binary
+          retention-days: 1
 
   apply:
     name: Terraform Apply
     needs: plan
     # Auto-deploy on push to main (suitable for home assignments/testing)
     # For production, consider requiring manual approval via workflow_dispatch
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # Only run if plan job succeeded
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.plan.result == 'success'
     runs-on: ubuntu-latest
     environment:
       name: production
@@ -137,10 +151,19 @@ jobs:
       # ---------------------------------------------------------
 
       - name: Download Plan Artifact
+        id: download_plan
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: tfplan
           path: .
+      
+      - name: Check Artifact Download
+        if: steps.download_plan.outcome != 'success'
+        run: |
+          echo "❌ Error: Failed to download plan artifact"
+          echo "This usually means the plan job failed or did not produce a valid plan file"
+          exit 1
 
       - name: Terraform Init (Backend only)
         run: |
