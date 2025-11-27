@@ -18,6 +18,7 @@ This repository contains Terraform configurations for setting up a production-gr
 - OIDC provider configuration for service account authentication
 - Automated Okta group rules for user access management
 
+
 ## Prerequisites
 
 - AWS CLI configured with appropriate credentials
@@ -25,7 +26,7 @@ This repository contains Terraform configurations for setting up a production-gr
 - kubectl
 - Okta admin account with API token access
 - GitHub repository with Actions enabled
-- IAM user with appropriate AWS permissions
+
 
 ## Project Structure
 
@@ -52,6 +53,7 @@ This repository contains Terraform configurations for setting up a production-gr
     └── workflows/
         └── infra.yml      # CI/CD pipeline configuration
 ```
+
 
 ## Getting Started
 
@@ -171,6 +173,7 @@ To reduce costs further:
 - Use Spot instances for nodes
 - Enable features only when needed (e.g., CloudWatch logging, KMS encryption)
 
+
 ## Security Features
 
 - **Private EKS Endpoint**: Cluster API endpoint configured for private access
@@ -181,6 +184,7 @@ To reduce costs further:
 - **Encrypted State**: S3 backend with encryption enabled
 - **State Locking**: DynamoDB prevents concurrent state modifications
 - **GitHub Actions Security**: Secrets stored securely in GitHub
+
 
 ## CI/CD Pipeline
 
@@ -205,6 +209,7 @@ The GitHub Actions workflow (`.github/workflows/infra.yml`) provides:
    - Downloads plan artifact
    - Applies infrastructure changes
    - Runs automatically on push to `main`
+
 
 ## Troubleshooting
 
@@ -241,8 +246,3 @@ This will:
 - Remove S3 bucket and DynamoDB table (if managed by Terraform)
 - Clean up local Terraform files
 
-## License
-
-MIT License
-
-For detailed documentation of each module, please refer to the README files in their respective directories.
