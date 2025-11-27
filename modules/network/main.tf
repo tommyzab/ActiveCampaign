@@ -20,7 +20,7 @@ resource "aws_internet_gateway" "main" {
   }
 }
 
-# Creates public subnets for load balancers with ELB role tag
+# Creates public subnets for load balancers with ELB role tag (one per AZ using count)
 resource "aws_subnet" "public" {
   count                   = length(var.public_subnets)
   vpc_id                  = aws_vpc.main.id
@@ -36,7 +36,7 @@ resource "aws_subnet" "public" {
   }
 }
 
-# Creates private subnets for EKS nodes with internal ELB role tag
+# Creates private subnets for EKS nodes with internal ELB role tag (one per AZ using count)
 resource "aws_subnet" "private" {
   count             = length(var.private_subnets)
   vpc_id            = aws_vpc.main.id
@@ -51,14 +51,14 @@ resource "aws_subnet" "private" {
   }
 }
 
-# Allocates EIP for NAT Gateway
+# Allocates EIP for NAT Gateway (only created if create_nat_gateway is true)
 resource "aws_eip" "nat" {
   count  = var.create_nat_gateway ? 1 : 0
   domain = "vpc"
   tags   = { Name = "${var.project_name}-nat-eip" }
 }
 
-# Creates NAT Gateway in public subnet to provide internet access for private subnets
+# Creates NAT Gateway in public subnet to provide internet access for private subnets (conditional)
 resource "aws_nat_gateway" "main" {
   count         = var.create_nat_gateway ? 1 : 0
   allocation_id = aws_eip.nat[0].id
@@ -82,7 +82,7 @@ resource "aws_route_table" "public" {
   tags = { Name = "${var.project_name}-public-rt" }
 }
 
-# Routes private subnet traffic through NAT Gateway when enabled
+# Routes private subnet traffic through NAT Gateway when enabled (dynamic block conditionally adds route)
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
   dynamic "route" {
@@ -98,7 +98,7 @@ resource "aws_route_table" "private" {
   tags = { Name = "${var.project_name}-private-rt" }
 }
 
-# Associates public subnets with public route table
+# Associates public subnets with public route table (one association per subnet using count)
 resource "aws_route_table_association" "public" {
   count          = length(var.public_subnets)
   subnet_id      = aws_subnet.public[count.index].id
@@ -107,7 +107,7 @@ resource "aws_route_table_association" "public" {
   depends_on = [aws_subnet.public, aws_route_table.public]
 }
 
-# Associates private subnets with private route table
+# Associates private subnets with private route table (one association per subnet using count)
 resource "aws_route_table_association" "private" {
   count          = length(var.private_subnets)
   subnet_id      = aws_subnet.private[count.index].id
