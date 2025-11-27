@@ -78,6 +78,9 @@ jobs:
         run: |
           set +e  # Allow plan to fail without exiting immediately
           
+          # Remove any existing plan file to ensure we start fresh
+          rm -f tfplan.binary
+          
           terraform plan -out=tfplan.binary > plan_output.txt 2>&1
           PLAN_EXIT=$?
           cat plan_output.txt
@@ -85,12 +88,20 @@ jobs:
           # If identity is disabled and we see Okta errors, that's expected
           if [[ "$ENABLE_IDENTITY_FLAG" != "true" ]] && grep -qiE "(okta|401|unauthorized|failed.*validate|failed.*load.*sdk|API token.*missing)" plan_output.txt; then
             echo "⚠️  Okta provider error detected but identity is disabled - this is expected"
-            [[ -f tfplan.binary ]] && echo "✅ Plan file created successfully" || echo "⚠️  Plan file not created, but Okta error is acceptable when identity is disabled"
+            # Don't upload plan if it failed due to Okta errors
+            rm -f tfplan.binary
             exit 0
           fi
           
-          # Success if plan file exists, otherwise exit with original code
-          [[ -f tfplan.binary ]] && exit 0 || exit $PLAN_EXIT
+          # Only succeed if plan completed successfully (exit code 0) AND file exists
+          if [[ $PLAN_EXIT -eq 0 ]] && [[ -f tfplan.binary ]]; then
+            echo "✅ Plan file created successfully"
+            exit 0
+          else
+            echo "❌ Plan failed or incomplete plan file"
+            rm -f tfplan.binary
+            exit $PLAN_EXIT
+          fi
 
       - name: Upload Plan Artifact
         uses: actions/upload-artifact@v4
@@ -138,6 +149,14 @@ jobs:
             -backend-config="region=${{ env.AWS_REGION }}" \
             -backend-config="dynamodb_table=${{ secrets.TF_STATE_TABLE }}" \
             -backend-config="key=global/s3/terraform.tfstate"
+
+      - name: Verify Plan File
+        run: |
+          if [[ ! -f tfplan.binary ]]; then
+            echo "❌ Error: Plan file not found"
+            exit 1
+          fi
+          echo "✅ Plan file found"
 
       - name: Terraform Apply
         env:
