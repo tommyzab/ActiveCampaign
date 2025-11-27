@@ -25,6 +25,8 @@ jobs:
   plan:
     name: Terraform fmt/validate/plan
     runs-on: ubuntu-latest
+    outputs:
+      plan_exists: ${{ steps.check_plan.outputs.exists }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -139,8 +141,12 @@ jobs:
     needs: plan
     # Auto-deploy on push to main (suitable for home assignments/testing)
     # For production, consider requiring manual approval via workflow_dispatch
-    # Only run if plan job succeeded
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.plan.result == 'success'
+    # Only run if plan job succeeded AND a plan file was actually created
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'push' &&
+      needs.plan.result == 'success' &&
+      needs.plan.outputs.plan_exists == 'true'
     runs-on: ubuntu-latest
     environment:
       name: production
@@ -163,19 +169,10 @@ jobs:
       # ---------------------------------------------------------
 
       - name: Download Plan Artifact
-        id: download_plan
-        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: tfplan
           path: .
-      
-      - name: Check Artifact Download
-        if: steps.download_plan.outcome != 'success'
-        run: |
-          echo "❌ Error: Failed to download plan artifact"
-          echo "This usually means the plan job failed or did not produce a valid plan file"
-          exit 1
 
       - name: Terraform Init (Backend only)
         run: |
