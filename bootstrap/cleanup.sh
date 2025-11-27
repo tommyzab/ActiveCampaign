@@ -41,14 +41,22 @@ fi
 if [ "$BACKEND_EXISTS" = true ]; then
     echo ""
     echo "1. Deleting S3 Bucket: $BUCKET_NAME..."
-    if aws s3 ls "s3://$BUCKET_NAME" 2>&1 | grep -q 'NoSuchBucket'; then
-        echo "   -> Bucket doesn't exist. Skipping."
+    # Check if bucket exists
+    if aws s3api head-bucket --bucket "$BUCKET_NAME" --region "$REGION" 2>/dev/null; then
+        echo "   -> Bucket exists. Deleting bucket and all contents..."
+        # Use --force to delete all objects and versions
+        if aws s3 rb "s3://$BUCKET_NAME" --region "$REGION" --force 2>/dev/null; then
+            echo "   -> Bucket deleted successfully."
+        else
+            echo "   -> Error deleting bucket. Trying to empty and delete manually..."
+            # Try to empty first, then delete
+            aws s3 rm "s3://$BUCKET_NAME" --recursive --region "$REGION" 2>/dev/null || true
+            aws s3 rb "s3://$BUCKET_NAME" --region "$REGION" 2>/dev/null && \
+                echo "   -> Bucket deleted successfully." || \
+                echo "   -> Warning: Could not delete bucket. It may still have objects or be in use."
+        fi
     else
-        echo "   -> Emptying bucket first..."
-        aws s3 rm "s3://$BUCKET_NAME" --recursive 2>/dev/null || echo "   -> Bucket already empty or error (continuing)..."
-        echo "   -> Deleting bucket..."
-        aws s3 rb "s3://$BUCKET_NAME" --region "$REGION" 2>/dev/null || echo "   -> Error deleting bucket (may not exist or have objects)"
-        echo "   -> Bucket deleted."
+        echo "   -> Bucket doesn't exist. Skipping."
     fi
 
     # 2. Delete DynamoDB Table
@@ -157,7 +165,7 @@ else
     echo "   -> ${KEYPAIR_NAME}.pem doesn't exist. Skipping."
 fi
 
-# Note: get-cluster-sg.sh is kept as it's a useful helper script
+# Note: Helper scripts (get-cluster-sg.sh) are kept as they're useful
 
 echo ""
 echo "====== CLEANUP COMPLETE ======"

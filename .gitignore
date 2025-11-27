@@ -1,10 +1,42 @@
-# Local .terraform directories
-**/.terraform/*
-.terraform/
+# Terraform State Files (Sensitive Information)
+terraform.tfstate
+terraform.tfstate.backup
+*.tfstate*
+!*.tfstate.example  # Allow example files
 
-# .tfstate files
-*.tfstate
-*.tfstate.*
+# Terraform Plan and Cache Files
+*.tfplan
+.terraform.lock.hcl
+.terraform/
+**/.terraform/*
+
+# AWS Credentials & Config (Local Profile)
+.aws/credentials
+.aws/config
+
+# IDE & Editor Files (VSCode, JetBrains, etc.)
+.vscode/
+.idea/
+*.iml
+
+# Logs & Debugging Files
+*.log
+*.log.*
+
+# Shell History & Execution Files
+*.sh~
+*.bak
+*.swp
+.DS_Store  # macOS metadata files
+
+# Private Keys & Sensitive Files
+*.pem
+*.p12
+*.key
+*.crt
+*.env
+*keypair*.pem
+okta-eks-nodes-keypair.pem
 
 # Secrets
 *.tfvars
@@ -17,11 +49,6 @@ override.tf
 # Personal notes
 COST_OPTIMIZATION_NOTES.md
 iam-policy-terraform-user.json
-
-# EC2 Key Pairs (sensitive)
-*.pem
-*keypair*.pem
-okta-eks-nodes-keypair.pem
 
 # Bootstrap scripts (local only, not in repo)
 bootstrap/

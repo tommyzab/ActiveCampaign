@@ -150,7 +150,9 @@ echo "6. Creating helper script to get cluster security group ID..."
 cat > bootstrap/get-cluster-sg.sh <<'HELPER_EOF'
 #!/bin/bash
 # Helper script to get the EKS cluster security group ID after terraform apply
-# This is needed for CloudFormation stack that creates unmanaged node groups
+
+# Disable AWS CLI pager to prevent interactive prompts
+export AWS_PAGER=""
 
 CLUSTER_NAME="${1:-demo-eks}"
 REGION="${2:-us-east-1}"
@@ -197,7 +199,6 @@ echo ""
 
 # Also update the node security group to allow traffic from cluster SG
 NODE_SG_NAME="okta-eks-nodes-sg"
-REGION="${2:-us-east-1}"
 DEFAULT_VPC_ID=$(aws ec2 describe-vpcs \
     --filters "Name=isDefault,Values=true" \
     --region "$REGION" \
@@ -232,21 +233,11 @@ if [ -n "$DEFAULT_VPC_ID" ] && [ "$DEFAULT_VPC_ID" != "None" ]; then
         fi
     fi
 fi
-
-echo ""
-echo "Use this in your CloudFormation stack parameters:"
-echo "  ClusterSecurityGroupId: $CLUSTER_SG_ID"
-echo "  NodeSecurityGroupId: $NODE_SG_ID"
-echo ""
-echo "Or export them:"
-echo "  export CLUSTER_SG_ID=$CLUSTER_SG_ID"
-if [ -n "$NODE_SG_ID" ] && [ "$NODE_SG_ID" != "None" ]; then
-    echo "  export NODE_SG_ID=$NODE_SG_ID"
-fi
 HELPER_EOF
 chmod +x bootstrap/get-cluster-sg.sh
 echo "   -> Created bootstrap/get-cluster-sg.sh helper script"
 
+echo ""
 echo "====== VERIFICATION ======"
 echo "Checking if resources exist..."
 aws s3 ls | grep "$BUCKET_NAME" || echo "   -> S3 bucket check skipped (may need credentials)"
@@ -264,7 +255,7 @@ fi
 
 echo ""
 echo "====== SUCCESS ======"
-echo "Backend created! Resources ready for CloudFormation:"
+echo "Backend created! Resources ready:"
 if [ -n "$NODE_SG_ID" ] && [ "$NODE_SG_ID" != "None" ]; then
     echo "  - Node Security Group ID: $NODE_SG_ID"
 fi
@@ -276,4 +267,3 @@ echo "  2. Run: terraform apply"
 echo "  3. After cluster is created, update the node security group to allow traffic from cluster SG:"
 echo "     ./bootstrap/get-cluster-sg.sh demo-eks"
 echo "     (Note: Terraform will also add this rule automatically if you run terraform apply)"
-echo "  4. Use the security group ID ($NODE_SG_ID) and keypair '$KEYPAIR_NAME' in your CloudFormation stack"
