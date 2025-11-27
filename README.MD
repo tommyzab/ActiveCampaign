@@ -67,7 +67,7 @@ Configure your backend in a `backend.tf` file or via backend configuration flags
 
 ### 2. Configure GitHub Secrets
 
-Set the following secrets in your GitHub repository (Settings → Secrets and variables → Actions):
+**It is strongly advised and preferred to store these as GitHub repository secrets** (Settings → Secrets and variables → Actions) for secure CI/CD pipeline execution:
 
 **Required:**
 - `AWS_ACCESS_KEY_ID` - AWS access key for deployment
@@ -122,7 +122,7 @@ The identity module automates Okta configuration for EKS access:
 
 ### Enabling Okta Integration
 
-1. **Set GitHub Secrets** (or export as environment variables):
+1. **Set GitHub Repository Secrets** (preferred) or export as environment variables for local deployment:
    ```bash
    export TF_VAR_enable_identity=true
    export TF_VAR_okta_org_name="dev-123456"  # Without -admin suffix
@@ -220,8 +220,8 @@ The GitHub Actions workflow (`.github/workflows/infra.yml`) provides:
 - Verify backend configuration in your Terraform setup
 
 **Okta Provider Validation Errors**
-- Ensure `ENABLE_IDENTITY` secret is set to `true` if using Okta
-- Verify `OKTA_API_TOKEN` and `OKTA_ORG_NAME` secrets are correct
+- Ensure `ENABLE_IDENTITY` GitHub repository secret is set to `true` if using Okta
+- Verify `OKTA_API_TOKEN` and `OKTA_ORG_NAME` GitHub repository secrets are correct
 - Check that org name doesn't include `-admin` suffix
 
 **EKS Cluster Creation Fails**
