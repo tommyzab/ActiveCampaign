@@ -13,7 +13,7 @@ resource "okta_group" "k8s_admins" {
   description = "Admins with system:masters access to EKS"
 }
 
-# Auto-assigns users with department="Engineering" attribute to "k8s-cluster-admins" group
+# Auto-assigns users with department="Engineering" attribute to "k8s-cluster-admins" group (runs automatically)
 resource "okta_group_rule" "engineering_rule" {
   name              = "Auto-Assign Engineering"
   group_assignments = [okta_group.k8s_admins.id]
@@ -21,7 +21,7 @@ resource "okta_group_rule" "engineering_rule" {
   status            = "ACTIVE"
 }
 
-# Creates OIDC app that connects users to EKS cluster via authorization code flow
+# Creates OIDC app that connects users to EKS cluster via authorization code flow (enables Okta login to k8s)
 resource "okta_app_oauth" "eks_client" {
   label          = "EKS Cluster Access"
   type           = "native"
@@ -31,7 +31,7 @@ resource "okta_app_oauth" "eks_client" {
   redirect_uris = ["http://localhost:8000/callback", "http://localhost:18000/callback"]
 }
 
-# Links k8s-cluster-admins group to OIDC app to grant EKS access
+# Links k8s-cluster-admins group to OIDC app to grant EKS access (connects group permissions to app)
 resource "okta_app_group_assignment" "assign_admins" {
   app_id   = okta_app_oauth.eks_client.id
   group_id = okta_group.k8s_admins.id
