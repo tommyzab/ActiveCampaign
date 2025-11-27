@@ -91,7 +91,10 @@ jobs:
             echo "⚠️  Okta provider error detected but identity is disabled - this is expected"
             # Don't upload plan if it failed due to Okta errors
             rm -f tfplan.binary
+            echo "expected_okta_error=true" >> $GITHUB_OUTPUT
             exit 0
+          else
+            echo "expected_okta_error=false" >> $GITHUB_OUTPUT
           fi
           
           # Only succeed if plan completed successfully (exit code 0) AND file exists
@@ -110,8 +113,10 @@ jobs:
         run: |
           if [[ -f tfplan.binary ]]; then
             echo "exists=true" >> $GITHUB_OUTPUT
+            echo "✅ Plan file exists and is ready"
           else
             echo "exists=false" >> $GITHUB_OUTPUT
+            echo "❌ Plan file does not exist"
           fi
 
       - name: Upload Plan Artifact
@@ -121,6 +126,13 @@ jobs:
           name: tfplan
           path: tfplan.binary
           retention-days: 1
+
+      - name: Fail Job If Plan Missing
+        if: steps.check_plan.outputs.exists != 'true' && steps.terraform_plan.outputs.expected_okta_error != 'true'
+        run: |
+          echo "❌ Plan job cannot proceed without a valid plan file"
+          echo "The terraform plan step must complete successfully to generate a plan file"
+          exit 1
 
   apply:
     name: Terraform Apply
