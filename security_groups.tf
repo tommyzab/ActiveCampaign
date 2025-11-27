@@ -1,20 +1,4 @@
-data "aws_security_groups" "eks_nodes_existing" {
-  filter {
-    name   = "group-name"
-    values = ["okta-eks-nodes-sg"]
-  }
-  filter {
-    name   = "vpc-id"
-    values = [module.network.vpc_id]
-  }
-}
-
-locals {
-  node_security_group_id = length(data.aws_security_groups.eks_nodes_existing.ids) > 0 ? data.aws_security_groups.eks_nodes_existing.ids[0] : aws_security_group.eks_nodes[0].id
-}
-
 resource "aws_security_group" "eks_nodes" {
-  count       = length(data.aws_security_groups.eks_nodes_existing.ids) == 0 ? 1 : 0
   name        = "okta-eks-nodes-sg"
   description = "Security group for EKS node groups (created by Terraform)"
   vpc_id      = module.network.vpc_id
@@ -45,6 +29,10 @@ resource "aws_security_group" "eks_nodes" {
     Environment = var.environment
     Project     = var.project_name
   }
+}
+
+locals {
+  node_security_group_id = aws_security_group.eks_nodes.id
 }
 
 resource "aws_security_group_rule" "cluster_to_nodes" {
