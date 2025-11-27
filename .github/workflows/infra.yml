@@ -119,6 +119,10 @@ jobs:
           else
             echo "exists=false" >> $GITHUB_OUTPUT
             echo "❌ Plan file does not exist"
+            # Check if plan step failed
+            if [[ "${{ steps.terraform_plan.outcome }}" != "success" ]]; then
+              echo "⚠️  Terraform plan step failed - check the plan output above for errors"
+            fi
           fi
 
       - name: Upload Plan Artifact
@@ -134,6 +138,12 @@ jobs:
         run: |
           echo "❌ Plan job cannot proceed without a valid plan file"
           echo "The terraform plan step must complete successfully to generate a plan file"
+          echo ""
+          echo "Common causes:"
+          echo "  - Terraform configuration errors (check plan output above)"
+          echo "  - Missing required variables or secrets"
+          echo "  - AWS credential or permission issues"
+          echo "  - Resource dependency conflicts"
           exit 1
 
   apply:
