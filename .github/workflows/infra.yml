@@ -87,7 +87,13 @@ jobs:
           # If identity is disabled, use -target to exclude identity module and avoid Okta provider issues
           if [[ "$ENABLE_IDENTITY_FLAG" != "true" ]]; then
             echo "Identity is disabled - planning without identity module to avoid Okta provider issues"
-            terraform plan -out=tfplan.binary -target=module.network -target=module.eks > plan_output.txt 2>&1
+            terraform plan -out=tfplan.binary \
+              -target=module.network \
+              -target=module.eks \
+              -target=aws_security_group.eks_nodes \
+              -target=aws_security_group_rule.cluster_to_nodes \
+              -target=terraform_data.validate_okta_config \
+              > plan_output.txt 2>&1
           else
             terraform plan -out=tfplan.binary > plan_output.txt 2>&1
           fi
@@ -101,7 +107,13 @@ jobs:
             # Try to create plan without identity module if plan failed
             if [[ $PLAN_EXIT -ne 0 ]] && [[ ! -f tfplan.binary ]]; then
               echo "Retrying plan without identity module..."
-              terraform plan -out=tfplan.binary -target=module.network -target=module.eks > plan_output.txt 2>&1
+              terraform plan -out=tfplan.binary \
+                -target=module.network \
+                -target=module.eks \
+                -target=aws_security_group.eks_nodes \
+                -target=aws_security_group_rule.cluster_to_nodes \
+                -target=terraform_data.validate_okta_config \
+                > plan_output.txt 2>&1
               PLAN_EXIT=$?
               cat plan_output.txt
             fi
