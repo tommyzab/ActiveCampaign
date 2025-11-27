@@ -13,7 +13,7 @@ resource "okta_group" "k8s_admins" {
   description = "Admins with system:masters access to EKS"
 }
 
-# Auto-assigns users with department="Engineering" to k8s-cluster-admins group
+# Auto-assigns users with department="Engineering" attribute to "k8s-cluster-admins" group
 resource "okta_group_rule" "engineering_rule" {
   name              = "Auto-Assign Engineering"
   group_assignments = [okta_group.k8s_admins.id]
