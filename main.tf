@@ -30,6 +30,8 @@ module "eks" {
   depends_on = [module.network]
 }
 
+
+# Conditionally creates Okta identity integration only if enable_identity is true
 module "identity" {
   count  = var.enable_identity ? 1 : 0
   source = "./modules/identity"
@@ -39,7 +41,8 @@ module "identity" {
   depends_on = [module.eks, terraform_data.validate_okta_config]
 }
 
-# Misc Resources
+
+# Validates Okta config is provided when identity is enabled, prevents common org name mistakes
 resource "terraform_data" "validate_okta_config" {
   lifecycle {
     precondition {
