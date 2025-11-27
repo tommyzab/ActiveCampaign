@@ -1,12 +1,16 @@
 # Infrastructure as Code with Terraform, EKS, and Okta Integration
 
+![Architecture Diagram](architecture.png)
+
+*Note: Architecture diagram showing AWS EKS cluster with Okta identity integration*
+
 This repository contains Terraform configurations for setting up a production-grade AWS EKS cluster with Okta identity integration, including automated CI/CD pipelines, networking, and security components.
 
 ## Features
 
 - EKS cluster with IRSA (IAM Roles for Service Accounts) enabled
 - Okta identity integration with automated group management
-- Default VPC and subnets (cost-optimized for lab environments)
+- Default VPC and subnets (optimized for restricted environments)
 - Unmanaged node groups via CloudFormation (for restricted environments)
 - GitHub Actions CI/CD with automated plan and apply
 - State management with encrypted S3 backend and DynamoDB locking
@@ -19,7 +23,7 @@ This repository contains Terraform configurations for setting up a production-gr
 - AWS CLI configured with appropriate credentials
 - Terraform >= 1.0.0
 - kubectl
-- Okta Developer account (optional, for identity integration)
+- Okta admin account with API token access
 - GitHub repository with Actions enabled
 - IAM user with permissions (see `iam-policy-terraform-user.json`)
 
@@ -29,8 +33,7 @@ This repository contains Terraform configurations for setting up a production-gr
 .
 ├── bootstrap/              # State management and infrastructure setup
 │   ├── setup.sh          # Creates S3 backend, DynamoDB table, EC2 keypair, security groups
-│   ├── cleanup.sh        # Removes backend resources and local files
-│   └── get-cluster-sg.sh # Helper script to retrieve cluster security group ID
+│   └── cleanup.sh        # Removes backend resources and local files
 ├── modules/
 │   ├── eks/              # EKS cluster configuration
 │   │   ├── main.tf       # Cluster definition with IRSA enabled
@@ -45,7 +48,7 @@ This repository contains Terraform configurations for setting up a production-gr
 │       ├── variables.tf  # Module variables
 │       └── outputs.tf    # VPC and subnet IDs
 ├── main.tf                # Main infrastructure orchestration
-├── variables.tf           # Root-level variable definitions
+├── variables.tf               # Root-level variable definitions
 ├── providers.tf           # AWS and Okta provider configurations
 ├── outputs.tf             # Root-level outputs
 └── .github/
@@ -71,7 +74,6 @@ This script will:
 - Generate `backend.tf` with the backend configuration
 - Create EC2 keypair for EKS nodes
 - Create security group for EKS nodes
-- Generate helper script for cluster security group retrieval
 
 ### 2. Configure GitHub Secrets
 
@@ -93,7 +95,7 @@ Set the following secrets in your GitHub repository (Settings → Secrets and va
 The CI/CD pipeline will automatically run on every push to `main`:
 
 1. **Plan Phase**: Runs `terraform fmt`, `validate`, and `plan` on every push
-2. **Apply Phase**: Automatically applies changes after successful plan (for home assignments)
+2. **Apply Phase**: Automatically applies changes after successful plan
 
 Alternatively, deploy locally:
 
@@ -169,21 +171,19 @@ The bootstrap script (`setup.sh`) automatically configures these security featur
 
 ## Cost Optimization
 
-This configuration is optimized for cost savings in lab/home assignment environments:
+This configuration is optimized for cost efficiency:
 
-- **Default VPC**: Uses existing default VPC (no NAT Gateway costs)
+- **Default VPC**: Uses existing default VPC
 - **Disabled CloudWatch Logging**: Cluster logging disabled (can be enabled for production)
 - **Disabled KMS Encryption**: Cluster encryption disabled (can be enabled for production)
-- **Unmanaged Node Groups**: Uses CloudFormation for nodes (avoids managed node group costs)
+- **Unmanaged Node Groups**: Uses CloudFormation for nodes
 - **Minimal Resources**: Conservative resource allocation
 - **Single Region**: All resources in `us-east-1`
-
-**Estimated Monthly Cost**: ~$134/month if running 24/7 (see `COST_OPTIMIZATION_NOTES.md` for details)
 
 To reduce costs further:
 - Scale down node groups during non-working hours
 - Use Spot instances for nodes
-- Enable features only when needed
+- Enable features only when needed (e.g., CloudWatch logging, KMS encryption)
 
 ## Security Features
 
@@ -202,7 +202,7 @@ The GitHub Actions workflow (`.github/workflows/infra.yml`) provides:
 
 - **Automated Validation**: Runs `terraform fmt` and `validate` on every push
 - **Automated Planning**: Generates execution plan and uploads as artifact
-- **Automated Deployment**: Applies changes automatically on push to `main` (for assignments)
+- **Automated Deployment**: Applies changes automatically on push to `main`
 - **Error Handling**: Gracefully handles Okta provider errors when identity is disabled
 - **Manual Approval**: Can be configured for production environments
 
@@ -238,7 +238,6 @@ The GitHub Actions workflow (`.github/workflows/infra.yml`) provides:
 - Ensure default VPC and subnets exist in the region
 
 **Node Group Creation**
-- Use `bootstrap/get-cluster-sg.sh` to retrieve cluster security group ID
 - Ensure EC2 keypair exists: `okta-eks-nodes-keypair`
 - Verify node security group exists: `okta-eks-nodes-sg`
 
@@ -258,24 +257,8 @@ This will:
 - Delete EC2 keypair and security groups
 - Clean up local Terraform files
 
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Ensure `terraform fmt` and `terraform validate` pass
-5. Create a Pull Request
-
-The CI/CD pipeline will automatically validate your changes.
-
 ## License
 
 MIT License
 
 For detailed documentation of each module, please refer to the README files in their respective directories.
-
-## Architecture Diagram
-
-![Architecture Diagram](architecture.png)
-
-*Note: Architecture diagram will be added once available*
